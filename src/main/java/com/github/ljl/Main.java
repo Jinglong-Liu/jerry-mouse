@@ -12,7 +12,7 @@ public class Main {
         JerryMouseBootstrap bootstrap = new JerryMouseBootstrap();
         bootstrap.start();
         logger.info("main START sleep");
-        TimeUnit.SECONDS.sleep(10);
+        TimeUnit.SECONDS.sleep(1000);
         logger.info("main END sleep");
         bootstrap.stop();
     }

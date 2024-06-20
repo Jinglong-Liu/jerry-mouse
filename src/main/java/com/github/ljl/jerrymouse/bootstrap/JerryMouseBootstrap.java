@@ -1,14 +1,19 @@
 package com.github.ljl.jerrymouse.bootstrap;
 
+import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
+import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import com.github.ljl.jerrymouse.threadpool.JerryMouseThreadPoolUtil;
+import com.github.ljl.jerrymouse.utils.JerryMouseFileUtils;
+import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
+import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Objects;
 
 /**
  * @program: jerry-mouse
@@ -39,24 +44,13 @@ public class JerryMouseBootstrap {
     public JerryMouseBootstrap() {
         this(DEFAULT_PORT);
     }
-    /**
-     * 符合 http 标准的字符串
-     * @param rawText 原始文本
-     * @return 结果
-     */
-    private static String httpResp(String rawText) {
-        String format = "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: text/plain\r\n" +
-                "\r\n" +
-                "%s";
 
-        return String.format(format, rawText);
-    }
     public void start() {
         threadPool.execute(() -> {
             startService();
         });
     }
+
     private void startService() {
         if(runningFlag) {
             logger.warn("[Jerry-mouse] server is already start!");
@@ -64,14 +58,32 @@ public class JerryMouseBootstrap {
         }
 
         logger.info("[Jerry-mouse] start listen on port {}", port);
-        logger.info("[Jerry-mouse] visit url http://{}:{}", LOCAL_HOST, port);
+        logger.info("[Jerry-mouse] visit url http://{}:{}/index.html", LOCAL_HOST, port);
         try {
             this.serverSocket = new ServerSocket(port);
             runningFlag = true;
-            while(true) {
+            while(runningFlag && !serverSocket.isClosed()) {
                 Socket socket = serverSocket.accept();
-                OutputStream outputStream = socket.getOutputStream();
-                outputStream.write(httpResp("Hello JerryMouse!").getBytes());
+                JerryMouseRequest request = new JerryMouseRequest(socket.getInputStream());
+                JerryMouseResponse response = new JerryMouseResponse(socket.getOutputStream());
+                // response.write(httpResp("Hello JerryMouse!").getBytes());
+                String staticHtmlPath = request.getUrl(); // null
+
+                // 展示静态html文件
+                if(Objects.nonNull(staticHtmlPath) && staticHtmlPath.endsWith(".html")) {
+                    String absolutePath = JerryMouseResourceUtils
+                            .buildFullPath(JerryMouseResourceUtils
+                                    .getClassRootResource(JerryMouseBootstrap.class)
+                                    , staticHtmlPath);
+                    String content = JerryMouseFileUtils.getFileContent(absolutePath);
+                    logger.info("[JerryMouse] static html path: {}, content={}", absolutePath, content);
+                    String html = JerryMouseHttpUtils.http200Resp(content);
+                    response.write(html);
+                }
+                else {
+                    String html = JerryMouseHttpUtils.http404Resp();
+                    response.write(html);
+                }
                 socket.close();
             }
 
@@ -83,7 +95,7 @@ public class JerryMouseBootstrap {
 
     public void stop() {
         if(!runningFlag) {
-            logger.warn("[MiniCat] server is not start!");
+            logger.warn("[JerryMouse] server is not start!");
             return;
         }
 
