@@ -1,2 +1,2 @@
 # jerry-mouse
-A Simplified Tomcat
+A simplified Tomcat
