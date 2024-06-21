@@ -19,9 +19,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.*;
+import java.util.Iterator;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @program: jerry-mouse
@@ -35,16 +41,13 @@ public class JerryMouseBootstrap {
 
     private static final int DEFAULT_PORT = 8080;
 
-    private static final String LOCAL_HOST = "127.0.0.1";
-
     private final int port;
-
-    private ServerSocket serverSocket;
-
-    private volatile boolean runningFlag;
 
     private JerryMouseThreadPoolUtil threadPool;
 
+    private ServerSocketChannel serverSocketChannel;
+
+    private Selector selector;
     /*
      * 请求分发
      */
@@ -71,55 +74,85 @@ public class JerryMouseBootstrap {
     }
 
     private void startService() {
-        if(runningFlag) {
-            logger.warn("[Jerry-mouse] server is already start!");
-            return;
-        }
-
-        logger.info("[Jerry-mouse] start listen on port {}", port);
-        logger.info("[Jerry-mouse] visit url http://{}:{}", LOCAL_HOST, port);
         try {
-            this.serverSocket = new ServerSocket(port);
-            runningFlag = true;
-            while(runningFlag && !serverSocket.isClosed()) {
-                try (Socket socket = serverSocket.accept();){
-                    JerryMouseRequest request = new JerryMouseRequest(socket.getInputStream());
-                    JerryMouseResponse response = new JerryMouseResponse(socket.getOutputStream());
+            serverSocketChannel = ServerSocketChannel.open();
+            serverSocketChannel.bind(new InetSocketAddress(port));
+            serverSocketChannel.configureBlocking(false);
 
-                    // 分发处理
-                    final RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
-                    dispatcherContext.setRequest(request);
-                    dispatcherContext.setResponse(response);
-                    // 需要get接口, 用于之后根据url获取servlet
-                    dispatcherContext.setServletManager(servletManager);
-                    this.requestDispatcher.dispatch(dispatcherContext);
-                    // socket.close();
-                } catch (IOException e) {
-                    logger.error("[JerryMouse] meet exception {}", e);
+            selector = Selector.open();
+            serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+            while (true) {
+                int readyChannels = selector.select();
+                if (readyChannels == 0) {
+                    continue;
+                }
+
+                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
+
+                while (keyIterator.hasNext()) {
+                    SelectionKey key = keyIterator.next();
+                    keyIterator.remove();
+                    if (key.isAcceptable()) {
+                        handleAccept(key);
+                    } else if (key.isReadable()) {
+                        handleRead(key);
+                    }
                 }
             }
-
         } catch (IOException e) {
-            logger.error("[JerryMouse] meet exception {}", e);
+            logger.error("[JerryMouse] start meet exception {}", e);
             throw new JerryMouseException(e);
         }
     }
+    private void handleAccept(SelectionKey key) throws IOException {
+        ServerSocketChannel serverSocketChannel = (ServerSocketChannel) key.channel();
+        SocketChannel socketChannel = serverSocketChannel.accept();
+        socketChannel.configureBlocking(false);
+        socketChannel.register(key.selector(), SelectionKey.OP_READ);
+    }
 
-    public void stop() {
-        if(!runningFlag) {
-            logger.warn("[JerryMouse] server is not start!");
-            return;
-        }
-
-        try {
-            if(this.serverSocket != null) {
-                serverSocket.close();
+    private void handleRead(SelectionKey key) {
+        // TODO: 异步执行会有问题
+        // threadPool.execute(() -> {
+            SocketChannel clientChannel = (SocketChannel) key.channel();
+            if (!clientChannel.isOpen()) {
+                return;
             }
-            this.runningFlag = false;
-            logger.info("[JerryMouse] stop listen on port {}", port);
-        } catch (IOException e) {
-            logger.error("[JerryMouse] stop meet ex", e);
-            throw new JerryMouseException(e);
+            try {
+                JerryMouseRequest request = new JerryMouseRequest(clientChannel);
+                JerryMouseResponse response = new JerryMouseResponse(clientChannel);
+                RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
+                dispatcherContext.setRequest(request);
+                dispatcherContext.setResponse(response);
+                dispatcherContext.setServletManager(servletManager);
+                requestDispatcher.dispatch(dispatcherContext);
+            } finally {
+                try {
+                    if (clientChannel.isOpen()) {
+                        key.interestOps(key.interestOps() | SelectionKey.OP_READ);
+                        key.selector().wakeup(); // 确保selector从阻塞状态返回
+                    } else {
+                        key.cancel();
+                    }
+                } catch (CancelledKeyException e) {
+                    logger.error("Key has been cancelled", e);
+                }
+            }
+        // });
+    }
+
+    public void shutdown() {
+        try {
+            threadPool.shutdown();
+        } finally {
+            try {
+                selector.close();
+                serverSocketChannel.close();
+            } catch (IOException e) {
+                logger.error("[JerryMouse] error closing server socket", e);
+            }
         }
     }
 }

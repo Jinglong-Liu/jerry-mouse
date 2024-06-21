@@ -8,6 +8,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SocketChannel;
 
 /**
  * @program: jerry-mouse
@@ -19,21 +22,24 @@ import java.io.OutputStream;
 public class JerryMouseResponse extends JerryMouseResponseAdaptor {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseBootstrap.class);
 
-    private final OutputStream outputStream;
+    private SocketChannel clientChannel;
 
-    public JerryMouseResponse(OutputStream outputStream) {
-        this.outputStream = outputStream;
+    public JerryMouseResponse(SocketChannel clientChannel) {
+        this.clientChannel = clientChannel;
     }
 
-    public void write(byte[] bytes) {
-        try {
-            outputStream.write(bytes);
-        } catch (IOException e) {
-            logger.error("[JerryMouse] write outputStream meet exception", e);
-            throw new JerryMouseException(e);
+    public void write(String data){
+        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes());
+        while (buffer.hasRemaining()) {
+            try {
+                clientChannel.write(buffer);
+                // 这句不能省略
+                clientChannel.close();
+            }
+            catch (IOException e) {
+                logger.error("[JerryMouse] meet exception");
+                throw new JerryMouseException(e);
+            }
         }
-    }
-    public void write(String s) {
-        write(s.getBytes());
     }
 }
