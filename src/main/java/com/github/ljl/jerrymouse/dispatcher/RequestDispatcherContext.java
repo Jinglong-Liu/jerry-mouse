@@ -4,8 +4,6 @@ import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
 import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * @program: jerry-mouse

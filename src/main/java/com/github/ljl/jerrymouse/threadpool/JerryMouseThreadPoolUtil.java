@@ -20,7 +20,7 @@ public class JerryMouseThreadPoolUtil {
 
     private static final int CORE_POOL_SIZE = 7;
 
-    private static final int MAX_POOL_SIZE = 20;
+    private static final int MAX_POOL_SIZE = 100;
 
     private static final long KEEP_ALIVE_TIME = 60L;
 
@@ -32,7 +32,7 @@ public class JerryMouseThreadPoolUtil {
                 TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>(CAPACITY),
                 Executors.defaultThreadFactory(),
-                new ThreadPoolExecutor.AbortPolicy()
+                new ThreadPoolExecutor.CallerRunsPolicy()
         );
     }
     public static JerryMouseThreadPoolUtil get() {

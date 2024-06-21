@@ -564,3 +564,165 @@ Jerry Mouse index html
 [uml](./uml/jerrymouse_v0.3.puml)
 
 参考文献：[houbb 从零手写实现 tomcat](https://houbb.github.io/2016/11/07/web-server-tomcat-05-hand-write-servlet-web-xml)
+
+## step 4、nio netty
+需求：bootstrap中的socket目前用的是最简单的bio，会阻塞
+要求改为nio
+分别完成手写nio和使用netty框架两个版本
+将旧版实现改为JerryMouseBootstrapBio, 用作复习
+
+nio 代码，此处有遗留问题 TODO
+```java
+class JerryMouseBootStrap {
+    private void startService() {
+        try {
+            serverSocketChannel = ServerSocketChannel.open();
+            serverSocketChannel.bind(new InetSocketAddress(port));
+            serverSocketChannel.configureBlocking(false);
+
+            selector = Selector.open();
+            serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+            while (true) {
+                int readyChannels = selector.select();
+                if (readyChannels == 0) {
+                    continue;
+                }
+
+                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
+
+                while (keyIterator.hasNext()) {
+                    SelectionKey key = keyIterator.next();
+                    keyIterator.remove();
+                    if (key.isAcceptable()) {
+                        handleAccept(key);
+                    } else if (key.isReadable()) {
+                        handleRead(key);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.error("[JerryMouse] start meet exception {}", e);
+            throw new JerryMouseException(e);
+        }
+    }
+    private void handleAccept(SelectionKey key) throws IOException {
+        ServerSocketChannel serverSocketChannel = (ServerSocketChannel) key.channel();
+        SocketChannel socketChannel = serverSocketChannel.accept();
+        socketChannel.configureBlocking(false);
+        socketChannel.register(key.selector(), SelectionKey.OP_READ);
+    }
+
+    private void handleRead(SelectionKey key) {
+        // TODO: 异步执行会有问题
+        // threadPool.execute(() -> {
+            SocketChannel clientChannel = (SocketChannel) key.channel();
+            if (!clientChannel.isOpen()) {
+                return;
+            }
+            try {
+                JerryMouseRequest request = new JerryMouseRequest(clientChannel);
+                JerryMouseResponse response = new JerryMouseResponse(clientChannel);
+                RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
+                dispatcherContext.setRequest(request);
+                dispatcherContext.setResponse(response);
+                dispatcherContext.setServletManager(servletManager);
+                requestDispatcher.dispatch(dispatcherContext);
+            } finally {
+                try {
+                    if (clientChannel.isOpen()) {
+                        key.interestOps(key.interestOps() | SelectionKey.OP_READ);
+                        key.selector().wakeup(); // 确保selector从阻塞状态返回
+                    } else {
+                        key.cancel();
+                    }
+                } catch (CancelledKeyException e) {
+                    logger.error("Key has been cancelled", e);
+                }
+            }
+        // });
+    }
+}
+
+public class JerryMouseRequest extends JerryMouseRequestAdaptor {
+    // 省略部分字段和接口
+    public JerryMouseRequest(SocketChannel socketChannel) {
+        this.socketChannel = socketChannel;
+        parseSocketChannel();
+    }
+
+    private void parseSocketChannel() {
+        StringBuilder requestBuffer = new StringBuilder(); // 缓存部分数据
+        ByteBuffer buffer = ByteBuffer.allocate(1024); // 使用固定大小的缓冲区
+        int bytesRead;
+        try {
+            while ((bytesRead = socketChannel.read(buffer)) > 0) {
+                buffer.flip();
+                byte[] data = new byte[buffer.remaining()];
+                buffer.get(data);
+                requestBuffer.append(new String(data));
+                buffer.clear();
+
+                // 检查是否读取到完整的HTTP请求行
+                if (requestBuffer.toString().contains("\n")) {
+                    // 获取第一行数据
+                    String firstLineStr = requestBuffer.toString().split("\\n")[0];
+                    String[] strings = firstLineStr.split(" ");
+                    this.method = strings[0];
+                    this.url = strings[1];
+
+                    logger.info("[JerryMouse] method={}, url={}", method, url);
+                    break; // 退出循环，因为我们已经读取到请求行
+                }
+            }
+        } catch (IOException e) {
+            logger.error("[JerryMouse] meet exception");
+            throw new JerryMouseException(e);
+        }
+
+
+        if ("".equals(method)) {
+            logger.info("[JerryMouse] No HTTP request line found, ignoring.");
+            // 可以选择抛出异常或者返回空请求对象
+        }
+
+        if (bytesRead <= 0) {
+            try {
+                socketChannel.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+public class JerryMouseResponse extends JerryMouseResponseAdaptor {
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseBootstrap.class);
+
+    private SocketChannel clientChannel;
+
+    public JerryMouseResponse(SocketChannel clientChannel) {
+        this.clientChannel = clientChannel;
+    }
+
+    public void write(String data){
+        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes());
+        while (buffer.hasRemaining()) {
+            try {
+                clientChannel.write(buffer);
+                // 这句不能省略
+                clientChannel.close();
+            }
+            catch (IOException e) {
+                logger.error("[JerryMouse] meet exception");
+                throw new JerryMouseException(e);
+            }
+        }
+    }
+}
+```
+
+区别在于，使用SocketChannel，而不是直接使用InputStream
+
+git log：[jerry-mouse] 4.1.1-nio 

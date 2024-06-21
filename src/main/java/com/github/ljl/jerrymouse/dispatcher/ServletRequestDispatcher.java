@@ -8,9 +8,11 @@ import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.Objects;
 
 /**
@@ -39,8 +41,8 @@ public class ServletRequestDispatcher implements IRequestDispatcher {
             // 正常的逻辑处理
             try {
                 httpServlet.service(request, response);
-            } catch (Exception e) {
-                logger.error("[JerryMouse] http servlet handle meet ex", e);
+            } catch (IOException | ServletException e) {
+                logger.error("[JerryMouse] http servlet handle meet exception");
                 throw new JerryMouseException(e);
             }
         }

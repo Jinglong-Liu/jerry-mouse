@@ -2,11 +2,14 @@ package com.github.ljl.jerrymouse.dto;
 
 import com.github.ljl.jerrymouse.adaptor.JerryMouseRequestAdaptor;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 /**
  * @program: jerry-mouse
@@ -22,26 +25,30 @@ public class JerryMouseRequest extends JerryMouseRequestAdaptor {
 
     private String url;
 
-    private InputStream inputStream;
+    @Getter
+    private SocketChannel socketChannel;
 
-    public JerryMouseRequest(InputStream inputStream) {
-        this.inputStream = inputStream;
-        this.parseInputStream();
+    public JerryMouseRequest(SocketChannel socketChannel) {
+        this.socketChannel = socketChannel;
+        parseSocketChannel();
     }
-    private void parseInputStream() {
 
-        byte[] buffer = new byte[1024]; // 使用固定大小的缓冲区
-        int bytesRead = 0;
-
-        // 注意不要使用inputStream.available()
+    private void parseSocketChannel() {
+        StringBuilder requestBuffer = new StringBuilder(); // 缓存部分数据
+        ByteBuffer buffer = ByteBuffer.allocate(1024); // 使用固定大小的缓冲区
+        int bytesRead;
         try {
-            while ((bytesRead = inputStream.read(buffer)) != -1) { // 循环读取数据直到EOF
-                String inputStr = new String(buffer, 0, bytesRead);
+            while ((bytesRead = socketChannel.read(buffer)) > 0) {
+                buffer.flip();
+                byte[] data = new byte[buffer.remaining()];
+                buffer.get(data);
+                requestBuffer.append(new String(data));
+                buffer.clear();
 
                 // 检查是否读取到完整的HTTP请求行
-                if (inputStr.contains("\n")) {
+                if (requestBuffer.toString().contains("\n")) {
                     // 获取第一行数据
-                    String firstLineStr = inputStr.split("\\n")[0];
+                    String firstLineStr = requestBuffer.toString().split("\\n")[0];
                     String[] strings = firstLineStr.split(" ");
                     this.method = strings[0];
                     this.url = strings[1];
@@ -50,17 +57,25 @@ public class JerryMouseRequest extends JerryMouseRequestAdaptor {
                     break; // 退出循环，因为我们已经读取到请求行
                 }
             }
-
-            if ("".equals(method)) {
-                logger.info("[JerryMouse] No HTTP request line found, ignoring.");
-                // 可以选择抛出异常或者返回空请求对象
-            }
         } catch (IOException e) {
-            logger.error("[JerryMouse] readFromStream meet ex", e);
+            logger.error("[JerryMouse] meet exception");
             throw new JerryMouseException(e);
         }
-    }
 
+
+        if ("".equals(method)) {
+            logger.info("[JerryMouse] No HTTP request line found, ignoring.");
+            // 可以选择抛出异常或者返回空请求对象
+        }
+
+        if (bytesRead <= 0) {
+            try {
+                socketChannel.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
     @Override
     public String getMethod() {
         return method;
