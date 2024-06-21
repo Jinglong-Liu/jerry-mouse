@@ -1,5 +1,6 @@
 package com.github.ljl.jerrymouse.dto;
 
+import com.github.ljl.jerrymouse.adaptor.JerryMouseResponseAdaptor;
 import com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import org.slf4j.Logger;
@@ -15,7 +16,7 @@ import java.io.OutputStream;
  * @create: 2024-06-20 15:27
  **/
 
-public class JerryMouseResponse {
+public class JerryMouseResponse extends JerryMouseResponseAdaptor {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseBootstrap.class);
 
     private final OutputStream outputStream;

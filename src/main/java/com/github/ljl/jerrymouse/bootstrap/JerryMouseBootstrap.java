@@ -1,12 +1,20 @@
 package com.github.ljl.jerrymouse.bootstrap;
 
+import com.github.ljl.jerrymouse.dispatcher.IRequestDispatcher;
+import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherContext;
+import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager;
 import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
 import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
+import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
+import com.github.ljl.jerrymouse.servlet.manager.WebXmlServletManager;
 import com.github.ljl.jerrymouse.threadpool.JerryMouseThreadPoolUtil;
 import com.github.ljl.jerrymouse.utils.JerryMouseFileUtils;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
+import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +45,17 @@ public class JerryMouseBootstrap {
 
     private JerryMouseThreadPoolUtil threadPool;
 
+    /*
+     * 请求分发
+     */
+    @Getter
+    @Setter
+    private IRequestDispatcher requestDispatcher = new RequestDispatcherManager();
+
+    @Getter
+    @Setter
+    private IServletManager servletManager = new WebXmlServletManager();
+
     public JerryMouseBootstrap(int port) {
         this.port = port;
         this.threadPool = JerryMouseThreadPoolUtil.get();
@@ -58,37 +77,30 @@ public class JerryMouseBootstrap {
         }
 
         logger.info("[Jerry-mouse] start listen on port {}", port);
-        logger.info("[Jerry-mouse] visit url http://{}:{}/index.html", LOCAL_HOST, port);
+        logger.info("[Jerry-mouse] visit url http://{}:{}", LOCAL_HOST, port);
         try {
             this.serverSocket = new ServerSocket(port);
             runningFlag = true;
             while(runningFlag && !serverSocket.isClosed()) {
-                Socket socket = serverSocket.accept();
-                JerryMouseRequest request = new JerryMouseRequest(socket.getInputStream());
-                JerryMouseResponse response = new JerryMouseResponse(socket.getOutputStream());
-                // response.write(httpResp("Hello JerryMouse!").getBytes());
-                String staticHtmlPath = request.getUrl(); // null
+                try (Socket socket = serverSocket.accept();){
+                    JerryMouseRequest request = new JerryMouseRequest(socket.getInputStream());
+                    JerryMouseResponse response = new JerryMouseResponse(socket.getOutputStream());
 
-                // 展示静态html文件
-                if(Objects.nonNull(staticHtmlPath) && staticHtmlPath.endsWith(".html")) {
-                    String absolutePath = JerryMouseResourceUtils
-                            .buildFullPath(JerryMouseResourceUtils
-                                    .getClassRootResource(JerryMouseBootstrap.class)
-                                    , staticHtmlPath);
-                    String content = JerryMouseFileUtils.getFileContent(absolutePath);
-                    logger.info("[JerryMouse] static html path: {}, content={}", absolutePath, content);
-                    String html = JerryMouseHttpUtils.http200Resp(content);
-                    response.write(html);
+                    // 分发处理
+                    final RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
+                    dispatcherContext.setRequest(request);
+                    dispatcherContext.setResponse(response);
+                    // 需要get接口, 用于之后根据url获取servlet
+                    dispatcherContext.setServletManager(servletManager);
+                    this.requestDispatcher.dispatch(dispatcherContext);
+                    // socket.close();
+                } catch (IOException e) {
+                    logger.error("[JerryMouse] meet exception {}", e);
                 }
-                else {
-                    String html = JerryMouseHttpUtils.http404Resp();
-                    response.write(html);
-                }
-                socket.close();
             }
 
         } catch (IOException e) {
-            logger.error("[JerryMouse] meet ex", e);
+            logger.error("[JerryMouse] meet exception {}", e);
             throw new JerryMouseException(e);
         }
     }

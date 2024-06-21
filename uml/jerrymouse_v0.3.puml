@@ -1,0 +1,165 @@
+@startuml
+left to right direction
+
+class jerrymouse.servlet.JerryMouseHttpTestServlet {
+# void doGet(HttpServletRequest,HttpServletResponse)
+# void doPost(HttpServletRequest,HttpServletResponse)
+}
+
+
+interface jerrymouse.dispatcher.IRequestDispatcher {
+~ void dispatch(RequestDispatcherContext)
+}
+
+class jerrymouse.servlet.JerryMouseHttpTest2Servlet {
+# void doGet(HttpServletRequest,HttpServletResponse)
+# void doPost(HttpServletRequest,HttpServletResponse)
+}
+
+
+class jerrymouse.utils.StringUtil {
++ {static} boolean isEmpty(String)
+}
+
+abstract class jerrymouse.servlet.AbstractJerryMouseServlet {
+# {abstract}void doGet(HttpServletRequest,HttpServletResponse)
+# {abstract}void doPost(HttpServletRequest,HttpServletResponse)
+# void service(HttpServletRequest,HttpServletResponse)
+}
+
+class jerrymouse.dispatcher.ServletRequestDispatcher {
++ void dispatch(RequestDispatcherContext)
+}
+
+abstract class jerrymouse.adaptor.JerryMouseRequestAdaptor {
+
+}
+
+class jerrymouse.utils.JerryMouseHttpUtils {
++ {static} String http200Resp(String)
++ {static} String http404Resp()
++ {static} String http500Resp()
++ {static} String http500Resp(Exception)
+}
+
+class jerrymouse.servlet.manager.WebXmlServletManager {
+- IServletManager manager
+- void loadFromWebXml()
++ void register(String,HttpServlet)
++ HttpServlet getServlet(String)
+}
+
+
+class jerrymouse.servlet.manager.DefaultServletManager {
+# Map<String,HttpServlet> servletMap
++ void register(String,HttpServlet)
++ HttpServlet getServlet(String)
+}
+
+
+class jerrymouse.utils.JerryMouseResourceUtils {
++ {static} String getClassRootResource(Class<?>)
++ {static} String buildFullPath(String,String)
+}
+
+
+class jerrymouse.utils.JerryMouseFileUtils {
++ {static} String getFileContent(String)
+}
+
+
+class jerrymouse.dispatcher.RequestDispatcherManager {
+- IRequestDispatcher emptyRequestDispatcher
+- IRequestDispatcher staticHtmlRequestDispatcher
+- IRequestDispatcher servletRequestDispatcher
++ void dispatch(RequestDispatcherContext)
+}
+
+
+abstract class jerrymouse.adaptor.JerryMouseResponseAdaptor {
+
+}
+
+class jerrymouse.bootstrap.JerryMouseBootstrap {
+- {static} int DEFAULT_PORT
+- {static} String LOCAL_HOST
+- int port
+- ServerSocket serverSocket
+- IRequestDispatcher requestDispatcher
+- IServletManager servletManager
++ void start()
+- void startService()
++ void stop()
+}
+
+
+class jerrymouse.dispatcher.StaticHtmlRequestDispatcher {
++ void dispatch(RequestDispatcherContext)
+}
+
+
+interface jerrymouse.servlet.manager.IServletManager {
+~ void register(String,HttpServlet)
+~ HttpServlet getServlet(String)
+}
+
+class jerrymouse.dto.JerryMouseRequest {
+- String method
+- String url
+- InputStream inputStream
+- void parseInputStream()
++ String getMethod()
++ String getUrl()
+}
+
+
+class jerrymouse.dispatcher.RequestDispatcherContext {
+- JerryMouseRequest request
+- JerryMouseResponse response
+- IServletManager servletManager
+}
+
+
+
+class jerrymouse.dto.JerryMouseResponse {
+- OutputStream outputStream
++ void write(byte[])
++ void write(String)
+}
+
+
+class jerrymouse.dispatcher.EmptyRequestDispatcher {
++ void dispatch(RequestDispatcherContext)
+}
+
+
+class jerrymouse.exception.JerryMouseException {
+}
+
+interface javax.servlet.http.HttpServletResponse {
+
+}
+
+interface javax.servlet.http.HttpServletRequest {
+
+}
+
+abstract class javax.servlet.http.HttpServlet {
+
+}
+
+jerrymouse.servlet.AbstractJerryMouseServlet <|-- jerrymouse.servlet.JerryMouseHttpTestServlet
+jerrymouse.servlet.AbstractJerryMouseServlet <|-- jerrymouse.servlet.JerryMouseHttpTest2Servlet
+javax.servlet.http.HttpServlet <|-- jerrymouse.servlet.AbstractJerryMouseServlet
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.ServletRequestDispatcher
+javax.servlet.http.HttpServletRequest <|.. jerrymouse.adaptor.JerryMouseRequestAdaptor
+jerrymouse.servlet.manager.IServletManager <|.. jerrymouse.servlet.manager.WebXmlServletManager
+jerrymouse.servlet.manager.IServletManager <|.. jerrymouse.servlet.manager.DefaultServletManager
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.RequestDispatcherManager
+javax.servlet.http.HttpServletResponse <|.. jerrymouse.adaptor.JerryMouseResponseAdaptor
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.StaticHtmlRequestDispatcher
+jerrymouse.adaptor.JerryMouseRequestAdaptor <|-- jerrymouse.dto.JerryMouseRequest
+jerrymouse.adaptor.JerryMouseResponseAdaptor <|-- jerrymouse.dto.JerryMouseResponse
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.EmptyRequestDispatcher
+jerrymouse.exception.RuntimeException <|-- jerrymouse.exception.JerryMouseException
+@enduml

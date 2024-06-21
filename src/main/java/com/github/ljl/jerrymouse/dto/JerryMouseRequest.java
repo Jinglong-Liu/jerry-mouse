@@ -1,7 +1,7 @@
 package com.github.ljl.jerrymouse.dto;
 
+import com.github.ljl.jerrymouse.adaptor.JerryMouseRequestAdaptor;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
-import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,12 +15,11 @@ import java.io.InputStream;
  * @create: 2024-06-20 15:27
  **/
 
-public class JerryMouseRequest {
+public class JerryMouseRequest extends JerryMouseRequestAdaptor {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseRequest.class);
 
     private String method;
 
-    @Getter
     private String url;
 
     private InputStream inputStream;
@@ -60,5 +59,14 @@ public class JerryMouseRequest {
             logger.error("[JerryMouse] readFromStream meet ex", e);
             throw new JerryMouseException(e);
         }
+    }
+
+    @Override
+    public String getMethod() {
+        return method;
+    }
+
+    public String getUrl() {
+        return url;
     }
 }

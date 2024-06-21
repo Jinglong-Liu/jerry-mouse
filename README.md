@@ -193,3 +193,374 @@ http://127.0.0.1:8080/index.html GET
 根据url，获取对应的html资源返回。
 
 git log: [jerry-mouse] request, response and static html
+
+## 3、servlet
+需求分析与背景：
+以上仅仅能够返回静态页面。更多时候我们需要返回接口数据，需要服务端处理判断
+这时候需要servlet
+所谓servlet，就是根据request，对response操作，返回页面或者数据
+Servlet 直接处理 HTTP 请求，通过 doGet、doPost 等方法对不同类型的请求进行响应。
+
+Servlet主要接口
+```java
+public abstract class AbstractJerryMouseServlet extends HttpServlet {
+
+    protected abstract void doGet(HttpServletRequest req, HttpServletResponse resp);
+
+    protected  abstract void doPost(HttpServletRequest req, HttpServletResponse resp);
+
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp){
+        if(JerryMouseHttpMethodType.GET.getCode().equalsIgnoreCase(req.getMethod())) {
+            this.doGet(req, resp);
+            return;
+        }
+
+        this.doPost(req, resp);
+    }
+}
+```
+再贴一个默认的service实现，就是这么简单
+```java
+public abstract class HttpServlet extends GenericServlet {
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String method = req.getMethod();
+        long lastModified;
+        if (method.equals("GET")) {
+            lastModified = this.getLastModified(req);
+            if (lastModified == -1L) {
+                this.doGet(req, resp);
+            } else {
+                long ifModifiedSince = req.getDateHeader("If-Modified-Since");
+                if (ifModifiedSince < lastModified) {
+                    this.maybeSetLastModified(resp, lastModified);
+                    this.doGet(req, resp);
+                } else {
+                    resp.setStatus(304);
+                }
+            }
+        } else if (method.equals("HEAD")) {
+            lastModified = this.getLastModified(req);
+            this.maybeSetLastModified(resp, lastModified);
+            this.doHead(req, resp);
+        } else if (method.equals("POST")) {
+            this.doPost(req, resp);
+        } else if (method.equals("PUT")) {
+            this.doPut(req, resp);
+        } else if (method.equals("DELETE")) {
+            this.doDelete(req, resp);
+        } else if (method.equals("OPTIONS")) {
+            this.doOptions(req, resp);
+        } else if (method.equals("TRACE")) {
+            this.doTrace(req, resp);
+        } else {
+            String errMsg = lStrings.getString("http.method_not_implemented");
+            Object[] errArgs = new Object[]{method};
+            errMsg = MessageFormat.format(errMsg, errArgs);
+            resp.sendError(501, errMsg);
+        }
+    }
+}
+```
+service 在servlet对应url被访问时调用
+那么，如何获得url和servlet的映射关系？这是Tomcat(Servlet容器)的功能，也就是本次需要模仿实现的功能
+需要实现一个manager, 实现下面两个接口
+```java
+public interface IServletManager {
+    /**
+     * 注册 servlet
+     *
+     * @param url     url
+     * @param servlet servlet
+     */
+    void register(String url, HttpServlet servlet);
+
+    /**
+     * 获取 servlet
+     *
+     * @param url url
+     * @return servlet
+     */
+    HttpServlet getServlet(String url);
+}
+```
+目前使用web.xml的方式管理，格式形如
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.4"
+         xmlns="http://java.sun.com/xml/ns/j2ee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd">
+
+    <servlet>
+        <servlet-name>test</servlet-name>
+        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpTestServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>test</servlet-name>
+        <url-pattern>/test</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>test2</servlet-name>
+        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpTest2Servlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>test2</servlet-name>
+        <url-pattern>/test2</url-pattern>
+    </servlet-mapping>
+</web-app>
+```
+
+不难想到，可以使用map存储url-servlet映射，作为公共基类，在这里使用组合而不是继承的方式
+```java
+public class DefaultServletManager implements IServletManager{
+
+    private static Logger logger = LoggerFactory.getLogger(DefaultServletManager.class);
+
+    protected final Map<String, HttpServlet> servletMap = new HashMap<>();
+
+    @Override
+    public void register(String url, HttpServlet servlet) {
+        logger.info("[JerryMouse] register servlet, url={}, servlet={}", url, servlet.getClass().getName());
+        servletMap.put(url, servlet);
+    }
+
+    @Override
+    public HttpServlet getServlet(String url) {
+        return servletMap.get(url);
+    }
+}
+```
+并在启动时加载一次web.xml文件，存储在内存
+```java
+public class WebXmlServletManager implements IServletManager {
+
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseHttpTestServlet.class);
+
+    private IServletManager manager = new DefaultServletManager();
+
+    public WebXmlServletManager() {
+        this.loadFromWebXml();
+    }
+
+    /**
+     * 1. 解析 web.xml
+     * 2. 读取对应的 servlet mapping
+     * 3. 保存对应的 url + servlet 示例到 servletMap
+     */
+    private synchronized void loadFromWebXml() {
+        // 加载web.xml文件
+        this.register(urlPattern, httpServlet);
+    }
+    @Override
+    public void register(String url, HttpServlet servlet) {
+        manager.register(url, servlet);
+    }
+
+    @Override
+    public HttpServlet getServlet(String url) {
+        return manager.getServlet(url);
+    }
+}
+```
+工具类`WebXmlServletManager` 目前在主程序中初始化一次即可，不会手动调用
+
+如此完成了url-servlet的映射
+
+主流程
+```java
+
+/**
+ * 对request, response, servletManager的封装
+ */
+@Data
+public class RequestDispatcherContext {
+
+    private JerryMouseRequest request;
+
+    private JerryMouseResponse response;
+
+    // 提供根据url获取Servlet的接口
+    private IServletManager servletManager;
+}
+```
+``` java
+public class JerryMouseBootstrap {
+    public void startService() {
+        //...
+        while(runningFlag && !serverSocket.isClosed()) {
+            try (Socket socket = serverSocket.accept();){
+                JerryMouseRequest request = new JerryMouseRequest(socket.getInputStream());
+                JerryMouseResponse response = new JerryMouseResponse(socket.getOutputStream());
+
+                // 分发处理
+                final RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
+                dispatcherContext.setRequest(request);
+                dispatcherContext.setResponse(response);
+                dispatcherContext.setServletManager(servletManager);
+                this.requestDispatcher.dispatch(dispatcherContext);
+                // socket.close();
+            } catch (IOException e) {
+                logger.error("[JerryMouse] meet exception {}", e);
+            }
+        }
+    }
+}
+```
+
+`RequestDispatcherManager` 相当于前端控制器，这里关注`servletRequestDispatcher
+另两种顾名思义，返回空页面和静态页面，用于测试
+
+```java
+public class RequestDispatcherManager implements IRequestDispatcher {
+
+    private final IRequestDispatcher emptyRequestDispatcher = new EmptyRequestDispatcher();
+    private final IRequestDispatcher staticHtmlRequestDispatcher = new StaticHtmlRequestDispatcher();
+    private final IRequestDispatcher servletRequestDispatcher = new ServletRequestDispatcher();
+
+    @Override
+    public void dispatch(RequestDispatcherContext context) {
+        final JerryMouseRequest request = context.getRequest();
+        // 分发
+        String requestUrl = request.getUrl();
+        if (StringUtil.isEmpty(requestUrl)) {
+            emptyRequestDispatcher.dispatch(context);
+        } else {
+            if (requestUrl.endsWith(".html")) {
+                staticHtmlRequestDispatcher.dispatch(context);
+            } else {
+                servletRequestDispatcher.dispatch(context);
+            }
+        }
+    }
+}
+```
+
+```java
+public class ServletRequestDispatcher implements IRequestDispatcher {
+    private static Logger logger = LoggerFactory.getLogger(ServletRequestDispatcher.class);
+
+    @Override
+    public void dispatch(RequestDispatcherContext context) {
+        JerryMouseRequest request = context.getRequest();
+        JerryMouseResponse response = context.getResponse();
+        IServletManager servletManager = context.getServletManager();
+
+        // 直接和 servlet 映射
+        String requestUrl = request.getUrl();
+        // 此处用到了之前注册的url-servlet
+        HttpServlet httpServlet = servletManager.getServlet(requestUrl);
+        if(Objects.isNull(httpServlet)) {
+            logger.warn("[JerryMouse] requestUrl={} mapping not found", requestUrl);
+            response.write(JerryMouseHttpUtils.http404Resp());
+        } else {
+            // 正常的逻辑处理
+            try {
+                // 用到了策略模式
+                httpServlet.service(request, response);
+            } catch (Exception e) {
+                logger.error("[JerryMouse] http servlet handle meet ex", e);
+                throw new JerryMouseException(e);
+            }
+        }
+    }
+}
+```
+
+如此，`httpServlet.service(request, response)` 后，一次调用完成
+
+回顾调用链
+
+1、容器初始化
+
+1.1 socket监听8080端口
+
+1.2 初始化WebXmlServletManager，扫描web.xml, 存储url-servlet map
+
+1.3 初始化RequestDispatcherManager，用于之后分发请求，选择使用静态页面还是servlet
+
+1.4 初始化ServletRequestDispatcher，用于分配到不同的servlet
+
+2、发送一个请求
+
+2.1 通过socket获得InputStream和OutputStream，存放到context
+
+2.2 RequestDispatcherManager通过context获得request，根据url判断
+是请求静态页面还是servlet
+
+2.3 如请求servlet， ServletRequestDispatcher 负责分发，从context中获取初始化的
+ServletManager(此处即WebXmlServletManager)，通过接口getServlet(url) 获取对应servlet
+
+2.4 获取到的servlet.service(request, response); 其中自己实现的servlet需要继承HttpServlet
+
+2.5 在service()中调用对应的doGet()或者doPost(), response.write()返回内容
+
+```
+"pool-1-thread-1@1208" prio=5 tid=0xd nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at com.github.ljl.jerrymouse.servlet.JerryMouseHttpTestServlet.doGet(JerryMouseHttpTestServlet.java:25)
+	  at com.github.ljl.jerrymouse.servlet.AbstractJerryMouseServlet.service(AbstractJerryMouseServlet.java:27)
+	  at javax.servlet.http.HttpServlet.service(HttpServlet.java:750)
+	  at com.github.ljl.jerrymouse.dispatcher.ServletRequestDispatcher.dispatch(ServletRequestDispatcher.java:41)
+	  at com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager.dispatch(RequestDispatcherManager.java:32)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.startService(JerryMouseBootstrap.java:95)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.lambda$start$0(JerryMouseBootstrap.java:69)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap$$Lambda$1.345281752.run(Unknown Source:-1)
+	  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+补充说明
+
+httpServlet.service(request, response)要求request和response，实现HttpServletRequest和HttpServletResponse接口
+然而，我们自己封装的简易request，response并没有实现接口中的所有方法, 不能过编译
+下面以Request为例说明处理方法：
+
+可以使用适配器模式，新建一个RequestAdaptor抽象类，实现HttpRequest的暂时不需要使用的接口
+仅需要默认实现，通过编译，不需要具体功能。而我们的Request只需要实现类似getMethod这样的，
+被其他模块用到的方法。
+
+其他多余的接口，目前并不打算用到，因此可以都先改为抛异常。
+
+Request继承Adaptor，实现getMethod等已经使用到的方法。
+
+![requestAdaptorDiagram.png](images/v0.3/requestAdaptorDiagram.png)
+
+当然也可以使用组合的方式
+
+至此，已经完成了最mini版本的servlet容器
+
+测试：
+
+```bash
+mvn clean
+mvn install
+
+启动Main
+
+# 使用postman等工具测试
+> GET http://127.0.0.1:8080/test
+JerryMouseHttpTestServlet-get
+> POST http://127.0.0.1:8080/test
+JerryMouseHttpTestServlet-post
+> GET http://127.0.0.1:8080/test2
+JerryMouseHttpTestServlet2-get
+> GET http://127.0.0.1:8080/test3
+404 Not Found: The requested resource was not found on this server.
+> GET http://127.0.0.1:8080/index.html
+Jerry Mouse index html
+> GET http://127.0.0.1:8080/1.html
+1 html
+> GET http://127.0.0.1:8080/2.html
+404 Not Found: The requested resource was not found on this server.
+
+```
+
+记为0.3版本
+
+[uml](./uml/jerrymouse_v0.3.puml)
+
+参考文献：[houbb 从零手写实现 tomcat](https://houbb.github.io/2016/11/07/web-server-tomcat-05-hand-write-servlet-web-xml)

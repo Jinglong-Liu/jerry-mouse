@@ -1,0 +1,9 @@
+package com.github.ljl.jerrymouse.dispatcher;
+
+public interface IRequestDispatcher {
+    /**
+     * 请求分发
+     * @param context 上下文
+     */
+    void dispatch(RequestDispatcherContext context);
+}
