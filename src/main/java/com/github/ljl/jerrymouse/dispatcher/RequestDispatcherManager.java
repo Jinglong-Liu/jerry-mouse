@@ -1,5 +1,6 @@
 package com.github.ljl.jerrymouse.dispatcher;
 
+import com.github.ljl.jerrymouse.dto.IRequest;
 import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
 import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
@@ -20,7 +21,7 @@ public class RequestDispatcherManager implements IRequestDispatcher {
 
     @Override
     public void dispatch(RequestDispatcherContext context) {
-        final JerryMouseRequest request = context.getRequest();
+        final IRequest request = context.getRequest();
         // 分发
         String requestUrl = request.getUrl();
         if (StringUtil.isEmpty(requestUrl)) {

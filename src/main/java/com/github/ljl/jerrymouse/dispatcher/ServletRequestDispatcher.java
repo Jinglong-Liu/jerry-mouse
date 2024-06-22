@@ -1,5 +1,7 @@
 package com.github.ljl.jerrymouse.dispatcher;
 
+import com.github.ljl.jerrymouse.dto.IRequest;
+import com.github.ljl.jerrymouse.dto.IResponse;
 import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
 import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
@@ -27,8 +29,8 @@ public class ServletRequestDispatcher implements IRequestDispatcher {
 
     @Override
     public void dispatch(RequestDispatcherContext context) {
-        JerryMouseRequest request = context.getRequest();
-        JerryMouseResponse response = context.getResponse();
+        IRequest request = context.getRequest();
+        IResponse response = context.getResponse();
         IServletManager servletManager = context.getServletManager();
 
         // 直接和 servlet 映射

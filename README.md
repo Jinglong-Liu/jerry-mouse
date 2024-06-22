@@ -726,3 +726,187 @@ public class JerryMouseResponse extends JerryMouseResponseAdaptor {
 区别在于，使用SocketChannel，而不是直接使用InputStream
 
 git log：[jerry-mouse] 4.1.1-nio 
+
+## 4.2 netty
+
+netty框架是
+```java
+
+```
+核心组件(回答来自chatgpt)
+- Channel：Netty 用于网络 I/O 操作的基本抽象，表示一个打开的连接，如 TCP 连接、文件等。通过 Channel 可以进行数据的读写操作。
+EventLoop
+
+- EventLoop：一个处理 I/O 操作的单线程执行器，每个 EventLoop 负责一个或多个 Channel 的 I/O 操作。EventLoopGroup 是 EventLoop 的集合，通常用于管理一组 EventLoop。
+ChannelHandler
+
+- ChannelHandler：是处理 I/O 事件的回调接口，可以实现自定义的业务逻辑，如编码、解码、业务处理等。
+ChannelPipeline
+
+- ChannelPipeline：是 ChannelHandler 的链，管理着 ChannelHandler 的调用顺序。每个 Channel 都有一个独立的 ChannelPipeline。
+Bootstrap 和 ServerBootstrap：
+
+这两个类用于引导客户端和服务器，配置各种参数并启动应用。
+
+使用方法 代码欣赏一下，主要是重写channelRead
+```java
+class JerryMouseBootStrap
+{
+    public void startService() {
+        logger.info("[JerryMouse] start listen on port {}", port);
+        logger.info("[JerryMouse] visit url http://{}:{}", LOCAL_HOST, port);
+
+        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        //worker 线程池的数量默认为 CPU 核心数的两倍
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+
+        try {
+            ServerBootstrap serverBootstrap = new ServerBootstrap();
+            serverBootstrap.group(bossGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(SocketChannel ch) {
+                            ch.pipeline().addLast(new JerryMouseServerHandler());
+                        }
+                    })
+                    .option(ChannelOption.SO_BACKLOG, 128)
+                    .childOption(ChannelOption.SO_KEEPALIVE, true);
+
+            // Bind and start to accept incoming connections.
+            ChannelFuture future = serverBootstrap.bind(port).sync();
+
+            // Wait until the server socket is closed.
+            future.channel().closeFuture().sync();
+            logger.info("DONE");
+        } catch (InterruptedException e) {
+            logger.error("JerryMouse start meet exception");
+            throw new JerryMouseException(e);
+        } finally {
+            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully();
+        }
+    }
+}
+public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseRequestUtils.class);
+
+    /**
+     * servlet 管理
+     *
+     * @since 0.3.0
+     */
+    private final IServletManager servletManager = new WebXmlServletManager();
+
+    /**
+     * 请求分发
+     *
+     * @since 0.3.0
+     */
+    private final IRequestDispatcher requestDispatcher = new RequestDispatcherManager();
+
+    @Override
+    public void channelRead(ChannelHandlerContext context, Object msg) throws Exception {
+        ByteBuf buf = (ByteBuf) msg;
+        byte[] bytes = new byte[buf.readableBytes()];
+        buf.readBytes(bytes);
+        String requestString = new String(bytes, Charset.defaultCharset());
+        logger.info("[JerryMouse] channelRead requestString={}", requestString);
+
+
+        // 获取请求信息
+        RequestInfoBo requestInfoBo = JerryMouseRequestUtils.buildRequestInfoBo(requestString);
+        IRequest request = new JerryMouseRequest(requestInfoBo.getMethod(), requestInfoBo.getUrl());
+        IResponse response = new JerryMouseResponse(context);
+
+        // 分发调用
+        final RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
+        dispatcherContext.setRequest(request);
+        dispatcherContext.setResponse(response);
+        dispatcherContext.setServletManager(servletManager);
+        requestDispatcher.dispatch(dispatcherContext);
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext context) throws Exception {
+        context.flush();
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext context, Throwable cause) throws Exception {
+        logger.error("JerryMouseServerHandler cause exception ", cause);
+        context.close();
+    }
+}
+
+```
+channelRead调用栈
+```
+"nioEventLoopGroup-3-1@1842" prio=10 tid=0xf nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseServerHandler.channelRead(JerryMouseServerHandler.java:49)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	  at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1410)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:919)
+	  at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	  at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	  at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	  at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	  at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	  at java.lang.Thread.run(Thread.java:748)
+
+```
+// TODO: netty内部源码分析
+
+架构修改：
+request和response，实际需要的是一些接口，例如getMethod，getUrl
+因此加一层接口，以request为例
+```java
+public interface IRequest extends HttpServletRequest {
+    /**
+     * 获取请求地址
+     * @return url
+     */
+    String getUrl();
+
+    /**
+     * 获取方法
+     * @return method
+     */
+    String getMethod();
+}
+public abstract class JerryMouseRequestAdaptor implements IRequest {
+    // 代码略
+}
+@Data
+@AllArgsConstructor
+public class JerryMouseRequest extends JerryMouseRequestAdaptor {
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseRequest.class);
+
+    private String method;
+
+    private String url;
+}
+```
+并以接口的形式使用
+
+删除了旧版代码
+
+[uml v0.4.2](./uml/jerrymouse_v0.4.2.puml)
+
+测试方式相同，功能测试正常
+
+// TODO：性能测试
+
+记为0.4.2
+
+git log: [jerrymouse] 0.4.2-using netty
+
+tag: v0.4.2

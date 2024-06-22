@@ -36,11 +36,19 @@
             <artifactId>dom4j</artifactId>
             <version>${dom4j.version}</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/io.netty/netty-all -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>${io.netty.netty-all.version}</version>
+        </dependency>
+
     </dependencies>
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <javax.servlet.version>4.0.1</javax.servlet.version>
         <dom4j.version>1.1</dom4j.version>
+        <io.netty.netty-all.version>4.1.86.Final</io.netty.netty-all.version>
     </properties>
 </project>
