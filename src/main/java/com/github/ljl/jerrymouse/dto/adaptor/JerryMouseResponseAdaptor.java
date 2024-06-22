@@ -1,4 +1,6 @@
-package com.github.ljl.jerrymouse.adaptor;
+package com.github.ljl.jerrymouse.dto.adaptor;
+
+import com.github.ljl.jerrymouse.dto.IResponse;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
@@ -15,7 +17,7 @@ import java.util.Locale;
  * @create: 2024-06-21 10:18
  **/
 
-public abstract class JerryMouseResponseAdaptor implements HttpServletResponse {
+public abstract class JerryMouseResponseAdaptor implements IResponse {
     @Override
     public void addCookie(Cookie cookie) {
 

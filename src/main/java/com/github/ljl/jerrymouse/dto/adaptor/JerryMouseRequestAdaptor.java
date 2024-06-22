@@ -1,4 +1,6 @@
-package com.github.ljl.jerrymouse.adaptor;
+package com.github.ljl.jerrymouse.dto.adaptor;
+
+import com.github.ljl.jerrymouse.dto.IRequest;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
@@ -18,7 +20,7 @@ import java.util.Map;
  * @create: 2024-06-21 10:13
  **/
 
-public abstract class JerryMouseRequestAdaptor implements HttpServletRequest {
+public abstract class JerryMouseRequestAdaptor implements IRequest {
 
     @Override
     public String getAuthType() {

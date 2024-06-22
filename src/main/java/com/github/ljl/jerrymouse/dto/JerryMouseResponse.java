@@ -1,16 +1,14 @@
 package com.github.ljl.jerrymouse.dto;
 
-import com.github.ljl.jerrymouse.adaptor.JerryMouseResponseAdaptor;
 import com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap;
-import com.github.ljl.jerrymouse.exception.JerryMouseException;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
 
 /**
  * @program: jerry-mouse
@@ -19,27 +17,19 @@ import java.nio.channels.SocketChannel;
  * @create: 2024-06-20 15:27
  **/
 
-public class JerryMouseResponse extends JerryMouseResponseAdaptor {
+public class JerryMouseResponse extends AbstractResponse {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseBootstrap.class);
 
-    private SocketChannel clientChannel;
-
-    public JerryMouseResponse(SocketChannel clientChannel) {
-        this.clientChannel = clientChannel;
+    private final ChannelHandlerContext context;
+    public JerryMouseResponse(ChannelHandlerContext context) {
+        this.context = context;
     }
-
-    public void write(String data){
-        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes());
-        while (buffer.hasRemaining()) {
-            try {
-                clientChannel.write(buffer);
-                // 这句不能省略
-                clientChannel.close();
-            }
-            catch (IOException e) {
-                logger.error("[JerryMouse] meet exception");
-                throw new JerryMouseException(e);
-            }
-        }
+    @Override
+    public void write(String text, String charsetStr) {
+        Charset charset = Charset.forName(charsetStr);
+        ByteBuf responseBuf = Unpooled.copiedBuffer(text, charset);
+        context.writeAndFlush(responseBuf)
+                .addListener(ChannelFutureListener.CLOSE); // Close the channel after sending the response
+        logger.info("[JerryMouse] channelRead writeAndFlush DONE");
     }
 }
