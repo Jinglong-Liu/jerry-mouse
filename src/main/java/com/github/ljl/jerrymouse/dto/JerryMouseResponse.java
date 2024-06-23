@@ -1,5 +1,6 @@
 package com.github.ljl.jerrymouse.dto;
 
+import com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -7,6 +8,10 @@ import io.netty.channel.ChannelHandlerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.charset.Charset;
 
 /**
@@ -21,8 +26,11 @@ public class JerryMouseResponse extends AbstractResponse {
 
     private final ChannelHandlerContext context;
 
+    private final HttpServletResponse helper;
+
     public JerryMouseResponse(ChannelHandlerContext context) {
         this.context = context;
+        helper = new JerryMouseResponseHelper(this);
     }
     @Override
     public void write(String text, String charsetStr) {
@@ -31,5 +39,35 @@ public class JerryMouseResponse extends AbstractResponse {
         context.writeAndFlush(responseBuf)
                 .addListener(ChannelFutureListener.CLOSE); // Close the channel after sending the response
         logger.info("[JerryMouse] channelRead writeAndFlush DONE");
+    }
+
+    /**
+     * @return PrintWriter
+     * @throws IOException
+     * @since 0.5.1
+     */
+    @Override
+    public PrintWriter getWriter() throws IOException {
+        return helper.getWriter();
+    }
+
+    /**
+     * @return PrintWriter
+     * @throws IOException
+     * @since 0.5.1
+     */
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+        return helper.getOutputStream();
+    }
+
+    /**
+     * @return PrintWriter
+     * @throws IOException
+     * @since 0.5.1
+     */
+    @Override
+    public void flushBuffer() throws IOException {
+        helper.flushBuffer();
     }
 }

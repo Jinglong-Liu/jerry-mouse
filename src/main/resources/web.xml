@@ -23,4 +23,14 @@
         <servlet-name>test2</servlet-name>
         <url-pattern>/test2</url-pattern>
     </servlet-mapping>
+
+    <servlet>
+        <servlet-name>test3</servlet-name>
+        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>test3</servlet-name>
+        <url-pattern>/test3</url-pattern>
+    </servlet-mapping>
 </web-app>

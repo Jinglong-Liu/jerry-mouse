@@ -1044,3 +1044,258 @@ git log:
 jerry-mouse:  [jerry-mouse] v0.5.0 load-other-webapp
 web-demo:     [web-demo] v0.5.0 load-other-webapp
 ```
+
+## 5.2 适配HttpServlet
+现在，我们写这么一个servlet
+```java
+public class JerryMouseHttpServlet extends HttpServlet {
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseHttpServlet.class);
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        String content = "HttpServlet-get using stream";
+        resp.setContentType("text/html");
+        try {
+            ServletOutputStream outputStream = resp.getOutputStream();
+            outputStream.print(JerryMouseHttpUtils.http200Resp(content));
+            resp.flushBuffer();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp){
+        String content = "HttpServlet-post using writer";
+        resp.setContentType("text/html");
+        try {
+            PrintWriter writer = resp.getWriter();
+            writer.print(JerryMouseHttpUtils.http200Resp(content));
+            resp.flushBuffer();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+直接扩展HttpServlet，并不直接使用JerryMouseResponse的write()接口，可以正常运行吗？
+
+编译运行没有问题，但结果不对
+
+这里使用了resp.getOutputStream()和resp.getWriter()，以及resp.flushBuffer()接口，用于写回数据
+入参是HttpServletResponse类型，而这只是一个接口！
+
+实现类在哪里？这不是自己已经实现的JerryMouseResponse，回顾一下代码逻辑
+```java
+public class ServletRequestDispatcher implements IRequestDispatcher {
+    @Override
+    public void dispatch(RequestDispatcherContext context) {
+        IRequest request = context.getRequest();
+        IResponse response = context.getResponse();
+        IServletManager servletManager = context.getServletManager();
+        HttpServlet httpServlet = servletManager.getServlet(request.getUrl());
+        // 省略判空以及异常处理
+        httpServlet.service(request, response);
+    }
+}
+```
+
+启动时，扫描web.xml注册servlet，也就是此处的httpServlet即为JerryMouseHttpServlet类型
+直接扩展自HttpServlet,因此默认的HttpServlet::service(), 根据Method转到doGet或者doPost等
+（前面的很多Servlet扩展自AbstractJerryMouseServlet，里面重写了service，注意区别）
+
+以GET方法为例，转到JerryMouseHttpServlet的doGet，我们关注request和response是从哪里得到的
+
+从自行封装的RequestDispatcherContext中得到，因此是自己写的JerryMouseResponse类型
+
+而我们目前仅仅用Adaptor蒙混过关（返回空），并没有真正重写getWrite()以及getOutputStream()方法
+
+因此肯定get不出来。而为什么前面的servlet可以运行？是因为使用了JerryMouseResponse的write()，而不是直接使用HttpServlet的一些接口
+
+所以是否要自己写HttpServlet的相关接口
+
+需要
+
+我们为什么用Tomcat可以把servlet跑起来？就是因为Tomcat实现了这些接口
+
+这能让servlet的编写者，在浑然不觉的情况下，编写servlet，放到tomcat中运行
+
+[Tomcat ResponseFacade 实现](https://github.com/apache/tomcat/blob/main/java/org/apache/catalina/connector/ResponseFacade.java)
+
+此处再次体会接口，协议的含义
+
+所以现在可以体会到Tomcat是干啥用的了
+
+我们这次想做的，是让一个遵循HttpServlet接口协议的servlet，放到JerryMouse上，可以正常运行，就行放到Tomcat上一样！
+
+HttpServlet接口非常多， 本次只实现getOutputStream和getWrite，让上面的JerryMouseHttpServlet可以正常运行。
+
+我们在JerryMouseResponse中，放入一个adaptor，代理执行
+
+```java
+public class JerryMouseResponse extends AbstractResponse {
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseResponse.class);
+
+    private final ChannelHandlerContext context;
+
+    private final HttpServletResponse helper;
+
+    public JerryMouseResponse(ChannelHandlerContext context) {
+        this.context = context;
+        helper = new JerryMouseResponseHelper(this);
+    }
+    @Override
+    public void write(String text, String charsetStr) {
+        Charset charset = Charset.forName(charsetStr);
+        ByteBuf responseBuf = Unpooled.copiedBuffer(text, charset);
+        context.writeAndFlush(responseBuf)
+                .addListener(ChannelFutureListener.CLOSE); // Close the channel after sending the response
+        logger.info("[JerryMouse] channelRead writeAndFlush DONE");
+    }
+
+    @Override
+    public PrintWriter getWriter() throws IOException {
+        return helper.getWriter();
+    }
+
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+        return helper.getOutputStream();
+    }
+
+    @Override
+    public void flushBuffer() throws IOException {
+        helper.flushBuffer();
+    }
+}
+
+/**
+ * Helper类，省去了HttpServletResponse中部分暂时用不到接口的默认实现
+ */
+public class JerryMouseResponseHelper implements HttpServletResponse {
+
+    private JerryMouseResponse response;
+    private StringWriter stringWriter;
+    private PrintWriter writer;
+    /**
+     * 采用ByteArrayServletOutputStream
+     * 若采用OutputStreamHelper(response)，则复用JerryMouseRequest.write()
+     * 两者均可正常运行
+     */
+    private final ServletOutputStream outputStream;
+
+    public JerryMouseResponseHelper(JerryMouseResponse response) {
+        this.response = response;
+        this.stringWriter = new StringWriter();
+        this.writer = new PrintWriter(stringWriter);
+        this.outputStream = new ByteArrayServletOutputStream();
+        // this.outputStream = new OutputStreamHelper(response);
+    }
+
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+        return outputStream;
+    }
+
+    /**
+     * @return PrintWriter
+     * @since 0.5.1
+     */
+    @Override
+    public PrintWriter getWriter() {
+        return writer;
+    }
+
+    @Override
+    public void flushBuffer() {
+        writer.flush();
+        outputStream.flush();
+
+        String writerContent = stringWriter.toString();
+        if (!writerContent.isEmpty()) {
+            response.write(writerContent, "UTF-8");
+        }
+
+        byte[] outputStreamContent = new byte[0];
+        if (outputStream instanceof ByteArrayServletOutputStream) {
+            outputStreamContent = ((ByteArrayServletOutputStream)outputStream).toByteArray();
+        }
+
+        if (outputStreamContent.length > 0) {
+            response.write(new String(outputStreamContent, Charset.forName("UTF-8")), "UTF-8");
+        }
+    }
+
+    /**
+     * 复用JerryMouseResponse
+     */
+    private static class OutputStreamHelper extends ServletOutputStream {
+
+        private final JerryMouseResponse response;
+
+        public OutputStreamHelper(JerryMouseResponse response) {
+            this.response = response;
+        }
+        @Override
+        public boolean isReady() {
+            return false;
+        }
+
+        @Override
+        public void setWriteListener(WriteListener writeListener) {
+
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+
+        }
+
+        @Override
+        public void print(String s) throws IOException {
+            response.write(s);
+        }
+    }
+    private static class ByteArrayServletOutputStream extends ServletOutputStream {
+        private ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        @Override
+        public void write(int b) throws IOException {
+            byteArrayOutputStream.write(b);
+        }
+
+        @Override
+        public boolean isReady() {
+            return true;
+        }
+
+        @Override
+        public void setWriteListener(WriteListener writeListener) {}
+
+        public byte[] toByteArray() {
+            return byteArrayOutputStream.toByteArray();
+        }
+
+        @Override
+        public void flush() throws IOException {
+            byteArrayOutputStream.flush();
+        }
+    }
+}
+
+```
+在web-demo项目中，编写测试servlet, 打包成war，放到相应目录
+
+测试
+```
+> GET http://127.0.0.1:8080/web-demo/http-demo
+web demo http index get using writer
+> POST http://127.0.0.1:8080/web-demo/http-demo
+web demo http index post using outputStream
+```
+
+```bash
+git log:
+jerry-mouse:  [jerry-mouse] v0.5.1 load-other-webapp-http
+web-demo:     [web-demo] v0.5.1 load-other-webapp-http
+```

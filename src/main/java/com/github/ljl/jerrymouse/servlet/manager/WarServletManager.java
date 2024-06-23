@@ -1,7 +1,8 @@
 package com.github.ljl.jerrymouse.servlet.manager;
 
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
-import com.github.ljl.jerrymouse.support.classloader.WebClassLoader;
+import com.github.ljl.jerrymouse.support.classloader.IClassLoader;
+import com.github.ljl.jerrymouse.support.classloader.WebAppClassLoader;
 import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
 import org.dom4j.Document;
 import org.dom4j.Element;
@@ -102,7 +103,7 @@ public class WarServletManager implements IServletManager {
             Path classesPath = buildClassesPath(baseDir, warDir);
             Path libPath = buildLibPath(baseDir, warDir);
             // IClassLoader classLoader = new WebAppClassLoader(classesPath, libPath);
-            IClassLoader classLoader = new WebClassLoader(classesPath, libPath);
+            IClassLoader classLoader = new WebAppClassLoader(classesPath, libPath);
             webXmlServletManager.loadFromWebXml(urlPrefix, document, classLoader);
         } catch (Exception e) {
             throw new JerryMouseException(e);

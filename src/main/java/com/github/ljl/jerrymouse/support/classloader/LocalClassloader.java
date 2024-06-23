@@ -1,4 +1,4 @@
-package com.github.ljl.jerrymouse.servlet.manager;
+package com.github.ljl.jerrymouse.support.classloader;
 
 /**
  * @program: jerry-mouse

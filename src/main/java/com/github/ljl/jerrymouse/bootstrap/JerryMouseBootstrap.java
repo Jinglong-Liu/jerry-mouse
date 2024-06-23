@@ -4,7 +4,7 @@ import com.github.ljl.jerrymouse.dispatcher.IRequestDispatcher;
 import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
-import com.github.ljl.jerrymouse.servlet.manager.LocalClassloader;
+import com.github.ljl.jerrymouse.support.classloader.LocalClassloader;
 import com.github.ljl.jerrymouse.servlet.manager.WarServletManager;
 import com.github.ljl.jerrymouse.servlet.manager.WebXmlServletManager;
 import com.github.ljl.jerrymouse.support.war.IWarExtractor;
@@ -64,9 +64,6 @@ public class JerryMouseBootstrap {
     @Getter
     @Setter
     private IRequestDispatcher requestDispatcher = new RequestDispatcherManager();
-
-
-    // private IServletManager servletManager = new WebXmlServletManager();
 
     /**
      * servlet 管理

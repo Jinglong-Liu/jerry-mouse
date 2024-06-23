@@ -1,6 +1,6 @@
 package com.github.ljl.jerrymouse.servlet.manager;
 
-import com.github.ljl.jerrymouse.exception.JerryMouseException;
+import com.github.ljl.jerrymouse.support.classloader.IClassLoader;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -9,10 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServlet;
-import java.io.File;
 import java.io.InputStream;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
