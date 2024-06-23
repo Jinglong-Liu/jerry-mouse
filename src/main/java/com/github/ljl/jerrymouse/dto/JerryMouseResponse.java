@@ -1,6 +1,5 @@
 package com.github.ljl.jerrymouse.dto;
 
-import com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -18,9 +17,10 @@ import java.nio.charset.Charset;
  **/
 
 public class JerryMouseResponse extends AbstractResponse {
-    private static Logger logger = LoggerFactory.getLogger(JerryMouseBootstrap.class);
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseResponse.class);
 
     private final ChannelHandlerContext context;
+
     public JerryMouseResponse(ChannelHandlerContext context) {
         this.context = context;
     }

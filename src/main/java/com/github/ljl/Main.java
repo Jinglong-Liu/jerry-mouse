@@ -8,9 +8,10 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseBootstrap.class);
+
+    private static final String baseWarDir = "D:\\java-learning\\jerry-mouse\\src\\test\\webapps";
     public static void main(String[] args) throws InterruptedException {
-        // JerryMouseBootstrap bootstrap = new JerryMouseBootstrap();
-        JerryMouseBootstrap bootstrap = new JerryMouseBootstrap();
+        JerryMouseBootstrap bootstrap = new JerryMouseBootstrap(baseWarDir);
         bootstrap.start();
         TimeUnit.SECONDS.sleep(1000);
     }

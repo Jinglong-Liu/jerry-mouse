@@ -4,7 +4,6 @@ import com.github.ljl.jerrymouse.dto.IResponse;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Collection;
@@ -18,6 +17,7 @@ import java.util.Locale;
  **/
 
 public abstract class JerryMouseResponseAdaptor implements IResponse {
+
     @Override
     public void addCookie(Cookie cookie) {
 

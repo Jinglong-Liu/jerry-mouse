@@ -1,5 +1,7 @@
 package com.github.ljl.jerrymouse.utils;
 
+import java.io.File;
+
 /**
  * @program: jerry-mouse
  * @description:
@@ -19,12 +21,12 @@ public class JerryMouseResourceUtils {
             path = path.substring(1);
         }
         String result = path;
-        if(prefix.endsWith("/")) {
+        if(prefix.endsWith(File.separator)) {
             result = prefix + path;
         } else {
-            result = prefix + "/" + path;
+            result = prefix + File.separator + path;
         }
-        if(os.contains("win")) {
+        if(os.contains("win") && (result.startsWith("\\") || result.startsWith("/"))) {
             result = result.substring(1);
         }
         return result;

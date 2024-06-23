@@ -4,8 +4,13 @@ import com.github.ljl.jerrymouse.dispatcher.IRequestDispatcher;
 import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
+import com.github.ljl.jerrymouse.servlet.manager.LocalClassloader;
+import com.github.ljl.jerrymouse.servlet.manager.WarServletManager;
 import com.github.ljl.jerrymouse.servlet.manager.WebXmlServletManager;
+import com.github.ljl.jerrymouse.support.war.IWarExtractor;
+import com.github.ljl.jerrymouse.support.war.WarExtractor;
 import com.github.ljl.jerrymouse.threadpool.JerryMouseThreadPoolUtil;
+import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -16,8 +21,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import lombok.Getter;
 import lombok.Setter;
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
+import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.InputStream;
 
 /**
  * @program: jerry-mouse
@@ -38,17 +48,44 @@ public class JerryMouseBootstrap {
 
     private JerryMouseThreadPoolUtil threadPool;
 
+    /**
+     * 默认文件夹
+     * @since 0.5.0
+     */
+    private String baseDir = JerryMouseResourceUtils.getClassRootResource(JerryMouseBootstrap.class);
+
+    /**
+     * war 解压管理
+     *
+     * @since 0.5.0
+     */
+    private IWarExtractor warExtractor = new WarExtractor();
+
     @Getter
     @Setter
     private IRequestDispatcher requestDispatcher = new RequestDispatcherManager();
 
+
+    // private IServletManager servletManager = new WebXmlServletManager();
+
+    /**
+     * servlet 管理
+     *
+     * @since 0.5.0
+     */
     @Getter
     @Setter
-    private IServletManager servletManager = new WebXmlServletManager();
+    private IServletManager servletManager = new WarServletManager();
+
+    private WebXmlServletManager localWebXmlServletManager = new WebXmlServletManager();
 
     public JerryMouseBootstrap(int port) {
         this.port = port;
         this.threadPool = JerryMouseThreadPoolUtil.get();
+    }
+    public JerryMouseBootstrap(String baseDir) {
+        this(DEFAULT_PORT);
+        this.baseDir = baseDir;
     }
     public JerryMouseBootstrap() {
         this(DEFAULT_PORT);
@@ -61,6 +98,7 @@ public class JerryMouseBootstrap {
     }
 
     public void startService() {
+        before();
         logger.info("[JerryMouse] start listen on port {}", port);
         logger.info("[JerryMouse] visit url http://{}:{}", LOCAL_HOST, port);
 
@@ -93,6 +131,26 @@ public class JerryMouseBootstrap {
         } finally {
             workerGroup.shutdownGracefully();
             bossGroup.shutdownGracefully();
+        }
+    }
+    private void before() {
+        logger.info("[MiniCat] beforeStart baseDir={}", baseDir);
+
+        //1. 加载解析所有的 war 包
+        //2. 解压 war 包
+        //3. 解析对应的 servlet 映射关系
+        warExtractor.extract(baseDir);
+
+        // 初始化 servlet 映射关系
+        servletManager.init(baseDir);
+
+        InputStream resourceAsStream = this.getClass().getClassLoader().getResourceAsStream("web.xml");
+        SAXReader saxReader = new SAXReader();
+        try {
+            Document document = saxReader.read(resourceAsStream);
+            localWebXmlServletManager.loadFromWebXml("", document, new LocalClassloader());
+        } catch (DocumentException e) {
+            e.printStackTrace();
         }
     }
 }

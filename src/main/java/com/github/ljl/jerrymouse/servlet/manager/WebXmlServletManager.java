@@ -1,15 +1,18 @@
 package com.github.ljl.jerrymouse.servlet.manager;
 
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
-import com.github.ljl.jerrymouse.servlet.JerryMouseHttpTestServlet;
 import org.dom4j.Document;
+import org.dom4j.DocumentException;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServlet;
+import java.io.File;
 import java.io.InputStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,24 +26,26 @@ import java.util.Map;
 
 public class WebXmlServletManager implements IServletManager {
 
-    private static Logger logger = LoggerFactory.getLogger(JerryMouseHttpTestServlet.class);
+    private static Logger logger = LoggerFactory.getLogger(WebXmlServletManager.class);
 
-    private IServletManager manager = new DefaultServletManager();
+    private IServletManager manager = DefaultServletManager.get();
 
-    public WebXmlServletManager() {
-        // 仅执行一次
-        this.loadFromWebXml();
-    }
     /**
-     * 1. 解析 web.xml
-     * 2. 读取对应的 servlet mapping
-     * 3. 注册对应的 url + servlet
+     * 默认采用本地加载Class
+     * @param urlPrefix
+     * @param resourceAsStream
      */
-    private synchronized void loadFromWebXml() {
-        InputStream resourceAsStream = this.getClass().getClassLoader().getResourceAsStream("web.xml");
+    public void loadFromWebXml(String urlPrefix, InputStream resourceAsStream, IClassLoader servletClassLoader) {
         SAXReader saxReader = new SAXReader();
         try {
             Document document = saxReader.read(resourceAsStream);
+            loadFromWebXml(urlPrefix, document, servletClassLoader);
+        } catch (DocumentException e) {
+            e.printStackTrace();
+        }
+    }
+    public void loadFromWebXml(String urlPrefix, Document document, IClassLoader servletClassLoader) {
+        try {
             Element rootElement = document.getRootElement();
             List<Element> selectNodes = rootElement.elements("servlet");
             Map<String, String> servletMap = new HashMap<>();
@@ -62,18 +67,26 @@ public class WebXmlServletManager implements IServletManager {
                 // 检查 <servlet-name> 是否存在于 <servlet> 元素中
                 if (servletMap.containsKey(servletName)) {
                     String servletClassName = servletMap.get(servletName);
-                    HttpServlet httpServlet = (HttpServlet) Class.forName(servletClassName).newInstance();
+                    // 加载class
+                    Class servletClazz = servletClassLoader.loadClass(servletClassName);
+                    HttpServlet httpServlet = (HttpServlet) servletClazz.newInstance();
                     /**
                      * 3. 注册对应的 url + servlet
                      */
-                    this.register(urlPattern, httpServlet);
+                    this.register(urlPrefix + urlPattern, httpServlet);
                 }
             }
         } catch (Exception e) {
             logger.error("[JerryMouse] read web.xml failed", e);
-            throw new JerryMouseException(e);
+            e.printStackTrace();
         }
     }
+
+    @Override
+    public void init(String baseDir) {
+
+    }
+
     @Override
     public void register(String url, HttpServlet servlet) {
         manager.register(url, servlet);

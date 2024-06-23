@@ -1,5 +1,6 @@
 package com.github.ljl.jerrymouse.servlet.manager;
 
+import com.github.ljl.jerrymouse.threadpool.JerryMouseThreadPoolUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,11 +15,30 @@ import java.util.Map;
  * @create: 2024-06-20 18:44
  **/
 
-public class DefaultServletManager implements IServletManager{
+public class DefaultServletManager implements IServletManager {
 
     private static Logger logger = LoggerFactory.getLogger(DefaultServletManager.class);
 
     protected final Map<String, HttpServlet> servletMap = new HashMap<>();
+
+    private static DefaultServletManager instance;
+
+    private DefaultServletManager() {}
+
+    public static DefaultServletManager get() {
+        if (instance == null) {
+            synchronized (JerryMouseThreadPoolUtil.class) {
+                if (instance == null) {
+                    instance = new DefaultServletManager();
+                }
+            }
+        }
+        return instance;
+    }
+    @Override
+    public void init(String baseDir) {
+
+    }
 
     @Override
     public void register(String url, HttpServlet servlet) {

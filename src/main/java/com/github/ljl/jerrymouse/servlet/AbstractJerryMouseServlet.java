@@ -2,11 +2,9 @@ package com.github.ljl.jerrymouse.servlet;
 
 import com.github.ljl.jerrymouse.constant.JerryMouseHttpMethodType;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 
 /**
  * @program: jerry-mouse

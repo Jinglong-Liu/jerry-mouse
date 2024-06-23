@@ -910,3 +910,137 @@ public class JerryMouseRequest extends JerryMouseRequestAdaptor {
 git log: [jerrymouse] 0.4.2-using netty
 
 tag: v0.4.2
+
+## 5、解析war包 类加载（难点）
+需求：
+目前仅加载自己写的servlet，现在要求能解析处理其他war包
+
+新建一个web-demo项目，写一个IndexServlet，并打包
+```
+mvn clean install
+```
+生成 web-demo目录 和 web-demo.war
+
+根据类路径（非当前项目）加载类信息
+
+问题: 测试servlet代码如下
+```java
+public class IndexServlet extends HttpServlet {
+    public IndexServlet() {
+    }
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        PrintWriter out = resp.getWriter(); // null 
+        resp.setContentType("text/html");
+        out.println("<h1>servlet index get</h1>");
+    }
+
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setContentType("text/html");
+        PrintWriter out = resp.getWriter();
+        out.println("<h1>servlet index post</h1>");
+    }
+}
+```
+继承HttpServlet
+但本次测试的Servlet逻辑自己实现。
+
+而JerryMouse服务器，和IndexServlet的公共接口，只有HttpServlet
+
+但实际上，JerryMouseResponse根本没有实现完整的HttpServlet，而是使用适配器
+
+JerryMouseResponseAdaptor蒙混过关
+适配器中，没有正确实现resp.getWriter()或者getOutputStream()接口
+（而是无效接口，再次体会一下接口，协议的作用）
+因此没法进行
+
+目前IndexServlet只能基于HttpServlet的接口，而内部的Servlet是这样写的
+```java
+public class JerryMouseHttpTestServlet extends AbstractJerryMouseServlet {
+
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseHttpTestServlet.class);
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        String content = "JerryMouseHttpTestServlet-get";
+
+        JerryMouseResponse response = (JerryMouseResponse) resp;
+        response.write(JerryMouseHttpUtils.http200Resp(content));
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
+        String content = "JerryMouseHttpTestServlet-post";
+
+        JerryMouseResponse response = (JerryMouseResponse) resp;
+        response.write(JerryMouseHttpUtils.http200Resp(content));
+    }
+}
+```
+
+因此，Servlet需要持有JerryMouseResponse的引用。。。吗？引入相关的库？
+有种立即见效的方式，就是使用反射强行调用。。。你就说能不能用吧
+
+```java
+public class IndexServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setContentType("text/html");
+        writeToResponse(resp,"servlet index get");
+    }
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setContentType("text/html");
+        writeToResponse(resp,"servlet index post");
+    }
+    private void writeToResponse(HttpServletResponse resp, String content) {
+        try {
+            Class<?> responseClass = resp.getClass();
+            Method writeMethod = responseClass.getMethod("write", String.class);
+            writeMethod.invoke(resp, IndexServlet.http200Resp(content));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    public static String http200Resp(String rawText) {
+        String format = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: text/plain\r\n" +
+                "\r\n" +
+                "%s";
+
+        return String.format(format, rawText);
+    }
+}
+```
+
+好！下面进行测试
+
+```bash
+# project web-demo
+mvn clean install
+将web-demo.war包放到jerry-mouse项目的test/webapps下
+# project jerry-mouse
+根据项目所在位置,修改 com.github.ljl.Main 中的 baseWarDir
+mvn clean install
+
+启动 com.github.ljl.Main
+
+# 功能测试
+> GET http://127.0.0.1:8080/web-demo/index
+servlet index get
+> POST http://127.0.0.1:8080/web-demo/index
+servlet index post
+> GET http://127.0.0.1:8080/test
+JerryMouseHttpTestServlet-get
+> POST http://127.0.0.1:8080/test
+JerryMouseHttpTestServlet-post
+> POST http://127.0.0.1:8080/test2
+JerryMouseHttpTestServlet2-post
+> GET http://127.0.0.1:8080/index.html
+Jerry Mouse index html
+```
+
+```bash
+git log:
+jerry-mouse:  [jerry-mouse] v0.5.0 load-other-webapp
+web-demo:     [web-demo] v0.5.0 load-other-webapp
+```
