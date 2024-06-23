@@ -2,9 +2,10 @@ package com.github.ljl.jerrymouse.dispatcher;
 
 import com.github.ljl.jerrymouse.dto.IRequest;
 import com.github.ljl.jerrymouse.dto.IResponse;
-import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
-import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
-import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
+import com.github.ljl.jerrymouse.support.servlet.DefaultServletManager;
+import com.github.ljl.jerrymouse.support.filter.IFilterManager;
+import com.github.ljl.jerrymouse.support.servlet.IServletManager;
+import com.github.ljl.jerrymouse.support.filter.DefaultFilterManager;
 import lombok.Data;
 
 /**
@@ -20,5 +21,7 @@ public class RequestDispatcherContext {
 
     private IResponse response;
 
-    private IServletManager servletManager;
+    private final IServletManager servletManager = DefaultServletManager.get();
+
+    private final IFilterManager filterManager = DefaultFilterManager.get();
 }

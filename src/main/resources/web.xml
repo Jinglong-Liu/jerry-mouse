@@ -33,4 +33,33 @@
         <servlet-name>test3</servlet-name>
         <url-pattern>/test3</url-pattern>
     </servlet-mapping>
+
+    <servlet>
+        <servlet-name>test-filter</servlet-name>
+        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseFilterTestServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>test-filter</servlet-name>
+        <url-pattern>/test-filter</url-pattern>
+    </servlet-mapping>
+
+    <filter>
+        <filter-name>helloFilter</filter-name>
+        <filter-class>com.github.ljl.jerrymouse.filter.HelloFilter</filter-class>
+    </filter>
+    <!--剔除/web-demo/-->
+    <filter-mapping>
+        <filter-name>helloFilter</filter-name>
+        <url-pattern>^(?!/web-demo/).*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>secondFilter</filter-name>
+        <filter-class>com.github.ljl.jerrymouse.filter.SecondFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>secondFilter</filter-name>
+        <url-pattern>/test-filter</url-pattern>
+    </filter-mapping>
 </web-app>

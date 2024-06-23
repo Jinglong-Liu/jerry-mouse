@@ -8,8 +8,6 @@ import com.github.ljl.jerrymouse.dto.IRequest;
 import com.github.ljl.jerrymouse.dto.IResponse;
 import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
 import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
-import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
-import com.github.ljl.jerrymouse.servlet.manager.WebXmlServletManager;
 import com.github.ljl.jerrymouse.utils.JerryMouseRequestUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -29,13 +27,6 @@ import java.nio.charset.Charset;
 
 public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseRequestUtils.class);
-
-    /**
-     * servlet 管理
-     *
-     * @since 0.3.0
-     */
-    private final IServletManager servletManager = new WebXmlServletManager();
 
     /**
      * 请求分发
@@ -62,7 +53,6 @@ public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
         final RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
         dispatcherContext.setRequest(request);
         dispatcherContext.setResponse(response);
-        dispatcherContext.setServletManager(servletManager);
         requestDispatcher.dispatch(dispatcherContext);
     }
 

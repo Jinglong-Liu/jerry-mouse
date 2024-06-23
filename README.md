@@ -1299,3 +1299,337 @@ git log:
 jerry-mouse:  [jerry-mouse] v0.5.1 load-other-webapp-http
 web-demo:     [web-demo] v0.5.1 load-other-webapp-http
 ```
+
+## 6、Filter FilterChain
+
+需求：实现FilterChain以及web.xml中filter字段的解析，让filter功能生效
+
+```
++---------+     +----------+     +---------+     +----------+
+|         |     |          |     |         |     |          |
+| Client  | --> | Pre-Proc | --> | Servlet | --> | Post-Proc|
+|         |     | Filter   |     |         |     | Filter   |
++---------+     +----------+     +---------+     +----------+
+                                    ^   |
+                                    |   v
+                                 +----------+
+                                 | Response |
+                                 +----------+
+# 实例
+
+   Client
+     |
+     v
+ +-------+   +-----------+   +--------+   +------------+
+ |       |-->|           |-->|        |-->|            |
+ |Browser|   |Pre-Filter |   |Servlet |   |Post-Filter |
+ |       |<--|           |<--|        |<--|            |
+ +-------+   +-----------+   +--------+   +------------+
+ 
+Client: 用户通过浏览器发送 HTTP 请求。
+Pre-Filter: 过滤器在请求到达 Servlet 之前执行预处理操作。
+Servlet: 核心业务逻辑在 Servlet 中处理。
+Post-Filter: 过滤器在响应返回客户端之前执行后处理操作。
+Response: 最终处理后的响应返回给客户端。
+```
+
+Filter代码例子
+```java
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import java.io.IOException;
+
+public class LoggingFilter implements Filter {
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        // 初始化代码
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
+        // 在请求处理前的逻辑
+        System.out.println("Request received at " + new java.util.Date());
+
+        // 传递请求到下一个过滤器或目标资源
+        chain.doFilter(request, response);
+
+        // 在响应处理后的逻辑
+        System.out.println("Response sent at " + new java.util.Date());
+    }
+
+    @Override
+    public void destroy() {
+        // 清理代码
+    }
+}
+
+```
+使用：web.xml
+```xml
+<filter>
+    <filter-name>LoggingFilter</filter-name>
+    <filter-class>com.example.LoggingFilter</filter-class>
+</filter>
+<filter-mapping>
+    <filter-name>LoggingFilter</filter-name>
+    <url-pattern>/*</url-pattern>
+</filter-mapping>
+```
+
+或使用 `@WebFilter`  注解
+
+ - tomcat 如何处理 filter 的？
+
+客户端（比如浏览器）发送一个请求到Tomcat。
+
+Tomcat的连接器（Connector）接收到这个请求。
+
+请求首先经过所有的Filter链。每个Filter都有机会检查和修改这个请求。
+
+一旦所有的Filter都处理完毕，请求就到达它的目标Servlet。
+
+Servlet处理请求，并生成一个响应。
+
+响应再次经过Filter链，每个Filter都有机会检查和修改这个响应。
+
+最后，响应被发送回客户端。
+
+本次JerryMouse需要做的时期
+
+1、完善解析web.xml的代码，解析并注册filter
+
+请参照解析servlet的代码，自行补充实现
+
+笔者这里对加载web.xml的代码稍作整理，后续会继续优化
+
+2、调用时机：
+
+关键类 `FilterChain`, 发现只是一个接口，实现在Tomcat中，因此也是本次需要实现的内容
+
+(再次思考Tomcat到底是干啥用的)
+
+```java
+public interface FilterChain {
+    void doFilter(ServletRequest var1, ServletResponse var2) throws IOException, ServletException;
+}
+```
+[Tomcat中的实现](https://github.com/apache/tomcat/blob/main/java/org/apache/catalina/core/ApplicationFilterChain.java)
+
+需要把servlet传进去，在恰当的时机调用其service()方法
+
+于是，Filter类和FilterChain类都有doFilter()
+
+Filter类的doFilter()回调用FilterChain的doFilter()，含义是执行下一个filter
+
+而filter执行完后，执行servlet的service()
+
+怎么实现呢，是不是有点绕。
+
+Tomcat的实现很完善，但是太复杂了，我们想一个简单办法
+
+首先Filter/FilterChain在哪里使用到，预期顺序是什么
+
+例如，有`HelloFilter helloFilter`和`SecondFilter secondFilter`
+
+和一个 `servlet`
+
+```java
+// 省略logger的引入和异常代码，自行添加
+public class HelloFilter extends HttpFilter {
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain) {
+        logger.info("[JerryMouse] Request received HelloFilter");
+        filterChain.doFilter(request, response);
+        logger.info("[JerryMouse] Response sent HelloFilter");
+    }
+}
+public class SecondFilter extends HttpFilter {
+    @Override
+    public void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) {
+        logger.info("[JerryMouse] Request received SecondFilter");
+        filterChain.doFilter(request, response);
+        logger.info("[JerryMouse] Response send second SecondFilter");
+    }
+}
+public class JerryMouseFilterTestServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        String content = "test filter get";
+        logger.info("[JerryMouse] servlet doGet is called");
+        PrintWriter printWriter = resp.getWriter();
+        printWriter.print(JerryMouseHttpUtils.http200Resp(content));
+        resp.flushBuffer();
+    }
+}
+```
+我们期待调用时的打印如下
+```
+[JerryMouse] Request received HelloFilter
+[JerryMouse] Request received SecondFilter
+[JerryMouse] servlet doGet is called
+[JerryMouse] Response send second SecondFilter
+[JerryMouse] Response sent HelloFilter
+```
+
+强烈建议先不往下看，自行实现相关逻辑，感觉可以出成算法题（设计题）用于面试。
+看起来有点绕，静下来想一想其实非常简单。
+
+我们先明确，在web.xml中的顺序，决定在filterList中的顺序，这点由解析xml(之前已经实现)时确定
+我们显然需要写一个FilterChain的实现类，并实现doFilter接口
+
+servlet.service()需要在里面调用
+
+翻一下之前的dispatch，servlet在此处被调用
+```java
+public class ServletRequestDispatcher implements IRequestDispatcher {
+    @Override
+    public void dispatch(RequestDispatcherContext context) {
+        IRequest request = context.getRequest();
+        IResponse response = context.getResponse();
+        IServletManager servletManager = context.getServletManager();
+        // url 决定servlet已经需要匹配的filter, 因此在此处引入filter
+        String requestUrl = request.getUrl();
+        HttpServlet httpServlet = servletManager.getServlet(requestUrl);
+        // servlet.service()被真正调用
+        httpServlet.service(request, response);
+    }
+}
+```
+
+添加filter逻辑后，dispatch的一种可能的实现代码逻辑如下
+```java
+public class ServletRequestDispatcher implements IRequestDispatcher {
+    private static Logger logger = LoggerFactory.getLogger(ServletRequestDispatcher.class);
+
+    @Override
+    public void dispatch(RequestDispatcherContext context) {
+        IRequest request = context.getRequest();
+        IResponse response = context.getResponse();
+        IServletManager servletManager = context.getServletManager();
+
+        // 直接和 servlet 映射
+        String requestUrl = request.getUrl();
+        List<Filter> filters = context.getFilterManager().getMatchFilters(requestUrl);
+        HttpServlet httpServlet = servletManager.getServlet(requestUrl);
+        // httpServlet.service(request, response);
+        filter(httpServlet, filters, request, response);
+    }
+    private void filter(Servlet servlet, List<Filter> filters, HttpServletRequest request, HttpServletResponse response){
+        FilterChain filterChain = new JerryMouseFilterChain(servlet, filters);
+        filterChain.doFilter(request, response);
+    }
+}
+```
+不直接使用servlet.service(), 而是把servlet和filterList传入自定义的FilterChain
+在filerChain.doFilter中执行
+
+别看Tomcat洋洋洒洒写了老多代码，下面只用几行即可实现最基本的逻辑
+
+这是笔者想到的一种写法，你想出来了吗
+```java
+public class JerryMouseFilterChain implements FilterChain {
+    private final Servlet servlet;
+
+    private final List<Filter> filters;
+
+    private int pos;
+
+    public JerryMouseFilterChain(Servlet servlet, List<Filter> filters) {
+        this.pos = 0;
+        this.servlet = servlet;
+        this.filters = filters;
+    }
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response) {
+        if(pos < filters.size()) {
+            Filter filter = filters.get(pos);
+            pos++;
+            filter.doFilter(request, response, this);
+        }
+        else if (pos == filters.size()) {
+            servlet.service(request, response);
+        }
+    }
+}
+```
+寥寥几行代码，一道easy算法题级别的代码量，就把filter基本功能实现了，你就说能不能用吧
+
+测试结果
+```
+2024-06-23 22:15:05 INFO  HelloFilter:24 - [JerryMouse] Request received HelloFilter
+2024-06-23 22:15:05 INFO  SecondFilter:25 - [JerryMouse] Request received SecondFilter
+2024-06-23 22:15:05 INFO  JerryMouseFilterTestServlet:30 - [JerryMouse] servlet doGet is called
+2024-06-23 22:15:05 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+2024-06-23 22:15:05 INFO  SecondFilter:29 - [JerryMouse] Response send second SecondFilter
+2024-06-23 22:15:05 INFO  HelloFilter:26 - [JerryMouse] Response sent HelloFilter
+```
+
+完美符合预期!
+
+这里就把看似简单的`FilterChain`从新（指从没听说过开始）理解了一遍
+
+`web-demo`也加上相关例子，并进行测试(补充测试load webapp的xml的filter是否正确，并补充测试没有对应filter的servlet)
+
+笔者参考的教程没有这部分，系笔者自行补充，虽然难度不大，但能快速独立解决问题(甚至没有问过神奇的gpt和copilot)，还是很让人兴奋的。
+
+测试用例（前面打印的时间以测试时间为准）
+```bash
+[web-demo]
+> mvn clean install
+war包放到jerry-mouse的相应位置
+[jerry-mouse]
+> mvn clean install
+> 启动 Main
+# testcase1
+> GET http://127.0.0.1:8080/test-filter
+控制台:
+2024-06-23 23:03:04 INFO  HelloFilter:24 - [JerryMouse] Request received HelloFilter
+2024-06-23 23:03:04 INFO  SecondFilter:25 - [JerryMouse] Request received SecondFilter
+2024-06-23 23:03:04 INFO  JerryMouseFilterTestServlet:30 - [JerryMouse] servlet doGet is called
+2024-06-23 23:03:04 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+2024-06-23 23:03:04 INFO  SecondFilter:29 - [JerryMouse] Response send second SecondFilter
+2024-06-23 23:03:04 INFO  HelloFilter:28 - [JerryMouse] Response sent HelloFilter
+返回:
+test filter get
+
+# testcase2
+> POST http://127.0.0.1:8080/test
+控制台:
+2024-06-23 23:04:01 INFO  HelloFilter:24 - [JerryMouse] Request received HelloFilter
+2024-06-23 23:04:01 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+2024-06-23 23:04:01 INFO  HelloFilter:28 - [JerryMouse] Response sent HelloFilter
+返回:
+JerryMouseHttpTestServlet-post
+
+# testcase3
+> GET http://127.0.0.1:8080/web-demo/http-demo
+控制台:
+[web-demo] Before web-demo SecondFilter
+2024-06-23 23:05:40 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+[web-demo] After web-demo SecondFilter
+返回:
+web demo http index get using writer
+
+# testcase4
+> GET http://127.0.0.1:8080/web-demo/index
+控制台:
+[web-demo] Before web-demo FirstFilter
+[web-demo] Before web-demo SecondFilter
+2024-06-23 23:06:52 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+[web-demo] After web-demo SecondFilter
+[web-demo] After web-demo FirstFilter
+返回:
+servlet index get
+```
+
+git log
+```bash
+[jerry-mouse] 0.6.1 add filter filterChain
+[web-demo] 0.6.1 add filter filterChain
+tag -a v0.6.1 -m "add filter filterChain"
+```

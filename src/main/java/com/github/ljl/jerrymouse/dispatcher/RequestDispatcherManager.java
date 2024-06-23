@@ -1,10 +1,9 @@
 package com.github.ljl.jerrymouse.dispatcher;
 
 import com.github.ljl.jerrymouse.dto.IRequest;
-import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
-import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
-import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
 import com.github.ljl.jerrymouse.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @program: jerry-mouse
@@ -15,6 +14,8 @@ import com.github.ljl.jerrymouse.utils.StringUtil;
 
 public class RequestDispatcherManager implements IRequestDispatcher {
 
+    private static Logger logger = LoggerFactory.getLogger(RequestDispatcherManager.class);
+
     private final IRequestDispatcher emptyRequestDispatcher = new EmptyRequestDispatcher();
     private final IRequestDispatcher staticHtmlRequestDispatcher = new StaticHtmlRequestDispatcher();
     private final IRequestDispatcher servletRequestDispatcher = new ServletRequestDispatcher();
@@ -22,15 +23,20 @@ public class RequestDispatcherManager implements IRequestDispatcher {
     @Override
     public void dispatch(RequestDispatcherContext context) {
         final IRequest request = context.getRequest();
-        // 分发
         String requestUrl = request.getUrl();
+        IRequestDispatcher requestDispatcher = getRequestDispatcher(requestUrl);
+
+        // 分发到不同类型的RequestDispatcher
+        requestDispatcher.dispatch(context);
+    }
+    private IRequestDispatcher getRequestDispatcher(String requestUrl) {
         if (StringUtil.isEmpty(requestUrl)) {
-            emptyRequestDispatcher.dispatch(context);
+            return emptyRequestDispatcher;
         } else {
             if (requestUrl.endsWith(".html")) {
-                staticHtmlRequestDispatcher.dispatch(context);
+                return staticHtmlRequestDispatcher;
             } else {
-                servletRequestDispatcher.dispatch(context);
+                return servletRequestDispatcher;
             }
         }
     }

@@ -3,13 +3,11 @@ package com.github.ljl.jerrymouse.bootstrap;
 import com.github.ljl.jerrymouse.dispatcher.IRequestDispatcher;
 import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
-import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
-import com.github.ljl.jerrymouse.support.classloader.LocalClassloader;
-import com.github.ljl.jerrymouse.servlet.manager.WarServletManager;
-import com.github.ljl.jerrymouse.servlet.manager.WebXmlServletManager;
 import com.github.ljl.jerrymouse.support.war.IWarExtractor;
 import com.github.ljl.jerrymouse.support.war.WarExtractor;
-import com.github.ljl.jerrymouse.threadpool.JerryMouseThreadPoolUtil;
+import com.github.ljl.jerrymouse.support.xml.IWebXmlManager;
+import com.github.ljl.jerrymouse.support.xml.WebXmlManager;
+import com.github.ljl.jerrymouse.support.threadpool.JerryMouseThreadPoolUtil;
 import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -21,13 +19,10 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import lombok.Getter;
 import lombok.Setter;
-import org.dom4j.Document;
-import org.dom4j.DocumentException;
-import org.dom4j.io.SAXReader;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
 
 /**
  * @program: jerry-mouse
@@ -70,11 +65,6 @@ public class JerryMouseBootstrap {
      *
      * @since 0.5.0
      */
-    @Getter
-    @Setter
-    private IServletManager servletManager = new WarServletManager();
-
-    private WebXmlServletManager localWebXmlServletManager = new WebXmlServletManager();
 
     public JerryMouseBootstrap(int port) {
         this.port = port;
@@ -130,24 +120,17 @@ public class JerryMouseBootstrap {
             bossGroup.shutdownGracefully();
         }
     }
+    private final IWebXmlManager webXmlManager = WebXmlManager.get();
     private void before() {
-        logger.info("[MiniCat] beforeStart baseDir={}", baseDir);
+        logger.info("[JerryMouse] beforeStart baseDir={}", baseDir);
 
-        //1. 加载解析所有的 war 包
-        //2. 解压 war 包
-        //3. 解析对应的 servlet 映射关系
+        //1. 加载解析并解压所有的 war 包
         warExtractor.extract(baseDir);
 
-        // 初始化 servlet 映射关系
-        servletManager.init(baseDir);
+        //2. 解析webapps对应的元素映射关系
+        webXmlManager.parseWebappXml(baseDir);
 
-        InputStream resourceAsStream = this.getClass().getClassLoader().getResourceAsStream("web.xml");
-        SAXReader saxReader = new SAXReader();
-        try {
-            Document document = saxReader.read(resourceAsStream);
-            localWebXmlServletManager.loadFromWebXml("", document, new LocalClassloader());
-        } catch (DocumentException e) {
-            e.printStackTrace();
-        }
+        //3. 加载本地web.xml
+        webXmlManager.parseLocalWebXml();
     }
 }

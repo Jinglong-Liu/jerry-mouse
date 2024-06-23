@@ -1,4 +1,4 @@
-package com.github.ljl.jerrymouse.servlet.manager;
+package com.github.ljl.jerrymouse.support.servlet;
 
 import javax.servlet.http.HttpServlet;
 

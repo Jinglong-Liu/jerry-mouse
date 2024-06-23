@@ -1,4 +1,4 @@
-package com.github.ljl.jerrymouse.threadpool;
+package com.github.ljl.jerrymouse.support.threadpool;
 
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 

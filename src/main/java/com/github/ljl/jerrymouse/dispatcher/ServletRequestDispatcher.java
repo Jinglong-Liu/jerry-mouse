@@ -2,19 +2,22 @@ package com.github.ljl.jerrymouse.dispatcher;
 
 import com.github.ljl.jerrymouse.dto.IRequest;
 import com.github.ljl.jerrymouse.dto.IResponse;
-import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
-import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
-import com.github.ljl.jerrymouse.servlet.manager.IServletManager;
+import com.github.ljl.jerrymouse.support.filter.JerryMouseFilterChain;
+import com.github.ljl.jerrymouse.support.servlet.IServletManager;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -33,20 +36,25 @@ public class ServletRequestDispatcher implements IRequestDispatcher {
         IResponse response = context.getResponse();
         IServletManager servletManager = context.getServletManager();
 
-        // 直接和 servlet 映射
+        // 找到注册好的相应的 servlet 和 List<Filter>
         String requestUrl = request.getUrl();
+        List<Filter> filters = context.getFilterManager().getMatchFilters(requestUrl);
         HttpServlet httpServlet = servletManager.getServlet(requestUrl);
         if(Objects.isNull(httpServlet)) {
             logger.warn("[JerryMouse] requestUrl={} mapping not found", requestUrl);
             response.write(JerryMouseHttpUtils.http404Resp());
         } else {
-            // 正常的逻辑处理
             try {
-                httpServlet.service(request, response);
+                // httpServlet.service(request, response);
+                filter(httpServlet, filters, request, response);
             } catch (IOException | ServletException e) {
                 logger.error("[JerryMouse] http servlet handle meet exception");
                 throw new JerryMouseException(e);
             }
         }
+    }
+    void filter(Servlet servlet, List<Filter> filters, HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        FilterChain filterChain = new JerryMouseFilterChain(servlet, filters);
+        filterChain.doFilter(request, response);
     }
 }
