@@ -3,6 +3,8 @@ package com.github.ljl.jerrymouse.utils;
 import com.github.ljl.jerrymouse.impl.dto.IRequest;
 import com.github.ljl.jerrymouse.impl.dto.JerryMouseRequest;
 
+import javax.servlet.ServletContext;
+
 /**
  * @program: jerry-mouse
  * @description:

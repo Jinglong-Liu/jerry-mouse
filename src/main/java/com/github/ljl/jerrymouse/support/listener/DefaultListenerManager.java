@@ -13,22 +13,10 @@ import java.util.stream.Collectors;
 
 public class DefaultListenerManager implements IListenerManager{
 
-    private static DefaultListenerManager instance;
-
     private Map<String, List<EventListener>> listenerMap = new HashMap<>();
 
-    private DefaultListenerManager() {}
+    public DefaultListenerManager() {}
 
-    public static DefaultListenerManager get() {
-        if (instance == null) {
-            synchronized (DefaultListenerManager.class) {
-                if (instance == null) {
-                    instance = new DefaultListenerManager();
-                }
-            }
-        }
-        return instance;
-    }
     @Override
     public void init(String baseDir) {
 
@@ -43,8 +31,7 @@ public class DefaultListenerManager implements IListenerManager{
     }
 
     /**
-     * TODO: 用urlPrefix区别，返回当前web-app的listener
-     * @return
+     * @return listeners
      */
     @Override
     public List<EventListener> getListeners() {

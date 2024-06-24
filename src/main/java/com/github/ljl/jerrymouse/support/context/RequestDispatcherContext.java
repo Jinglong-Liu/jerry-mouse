@@ -1,7 +1,8 @@
-package com.github.ljl.jerrymouse.dispatcher;
+package com.github.ljl.jerrymouse.support.context;
 
 import com.github.ljl.jerrymouse.impl.dto.IRequest;
 import com.github.ljl.jerrymouse.impl.dto.IResponse;
+import com.github.ljl.jerrymouse.support.context.JerryMouseAppContext;
 import com.github.ljl.jerrymouse.support.servlet.DefaultServletManager;
 import com.github.ljl.jerrymouse.support.filter.IFilterManager;
 import com.github.ljl.jerrymouse.support.servlet.IServletManager;
@@ -21,7 +22,13 @@ public class RequestDispatcherContext {
 
     private IResponse response;
 
-    private final IServletManager servletManager = DefaultServletManager.get();
+    private JerryMouseAppContext appContext;
 
-    private final IFilterManager filterManager = DefaultFilterManager.get();
+    public IServletManager getServletManager() {
+        return appContext.getServletManager();
+    }
+
+    public IFilterManager getFilterManager() {
+        return appContext.getFilterManager();
+    }
 }

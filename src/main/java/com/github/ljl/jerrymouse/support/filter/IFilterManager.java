@@ -15,11 +15,11 @@ public interface IFilterManager {
     /**
      * 注册 servlet
      *
-     * @param url     url
-     * @param filter servlet
+     * @param urlPattern
+     * @param filter
      * @since 0.6.1
      */
-    void register(String url, Filter filter);
+    void register(String urlPattern, Filter filter);
 
     /**
      * 获取 servlet
@@ -31,8 +31,8 @@ public interface IFilterManager {
     Filter getFilter(String url);
 
     /**
-     * 获取匹配的
-     * @param url 正则
+     * 获取匹配的所有Filter
+     * @param url
      * @return 结果
      * @since 0.6.1
      */

@@ -1,0 +1,106 @@
+@startuml
+
+left to right direction
+
+package jerrymouse.support.xml {
+    interface IWebXmlManager {
+        void parseWebappXml(String baseDir)
+        void parseLocalWebXml()
+    }
+    class WebXmlManager {
+        - IContextManager contextManager
+        - String baseDirStr;
+        - void loadFromWebXml(String urlPrefix, Document document, IClassLoader classLoader)
+        - void addAppContext(String urlPrefix)
+        - void handleWarPackage(File warDir)
+        - void loadAndRegisterWebapps(String baseDir, String urlPrefix, File webXmlFile, File warDir)
+        - void loadServletFromWebXml(String urlPrefix, Document, IClassLoader)
+        - void loadFilterFromWebXml(String urlPrefix, Document, IClassLoader)
+        - void loadListenerFromWebXml(String urlPrefix, Document, IClassLoader)
+    }
+
+}
+
+package jerrymouse.support.context {
+    interface IAppContext {
+        void setAttribute(String name, Object object)
+        void removeAttribute(String name)
+        Object getAttribute(String name)
+        Enumeration<String> getAttributeNames()
+        void registerServlet(String urlPattern, Servlet servlet)
+        void registerFilter(String urlPattern, Filter filter)
+        void registerListener(EventListener listener)
+    }
+    interface IContextManager {
+        ServletContext getServletContext(IRequest request)
+        ServletContext getServletContext(String name)
+        void registerServletContext(String name, ServletContext context)
+    }
+    class JerryMouseContextManager << singleton >> {
+        - Map<String, ServletContext> contextMap
+        - ServletContext getLocalContext()
+    }
+    abstract class JerryMouseContextAdaptor {
+    }
+    class RequestDispatcherContext {
+        - IRequest request
+        - IResponse response
+        - JerryMouseAppContext appContext
+        + IServletManager getServletManager()
+        + IFilterManager getFilterManager()
+    }
+    class JerryMouseAppContext {
+        - Map<String, Object> attributes
+        + IListenerManager listenerManager
+        + IFilterManager filterManager
+        + IServletManager servletManager
+    }
+}
+package jerrymouse.support.servlet {
+    interface IServletManager {
+        void init(String baseDir);
+        void register(String url, HttpServlet servlet);
+        HttpServlet getServlet(String url);
+    }
+
+    class DefaultServletManager {
+        - Map<String, HttpServlet> servletMap
+    }
+}
+
+package jerrymouse.support.listener {
+    interface IListenerManager {
+        void init(String baseDir);
+        void register(String urlPrefix, EventListener listener);
+        List<EventListener> getListeners();
+    }
+    class DefaultListenerManager {
+        - Map<String, List<EventListener>> listenerMap;
+    }
+}
+package jerrymouse.support.filter {
+    interface IFilterManager {
+        void init(String baseDir)
+        void register(String urlPattern, Filter filter)
+        Filter getFilter(String url)
+        List<Filter> getMatchFilters(String url)
+    }
+    class DefaultFilterManager {
+        - Map<String, Filter> filterMap
+    }
+}
+package javax.servlet {
+    interface ServletContext {
+    }
+}
+jerrymouse.support.filter.IFilterManager <|.. jerrymouse.support.filter.DefaultFilterManager
+jerrymouse.support.servlet.IServletManager <|.. jerrymouse.support.servlet.DefaultServletManager
+jerrymouse.support.listener.IListenerManager <|.. jerrymouse.support.listener.DefaultListenerManager
+
+jerrymouse.support.context.IAppContext <|.. jerrymouse.support.context.JerryMouseAppContext
+jerrymouse.support.context.IContextManager <|.. jerrymouse.support.context.JerryMouseContextManager
+javax.servlet.ServletContext <|..  jerrymouse.support.context.JerryMouseContextAdaptor
+jerrymouse.support.context.JerryMouseContextAdaptor <|-- jerrymouse.support.context.JerryMouseContextManager
+
+jerrymouse.support.xml.IWebXmlManager <|.. jerrymouse.support.xml.WebXmlManager
+@enduml

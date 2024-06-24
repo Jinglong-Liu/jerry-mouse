@@ -1,8 +1,12 @@
 package com.github.ljl.jerrymouse.impl.dto;
 
 import com.github.ljl.jerrymouse.impl.dto.adaptor.JerryMouseRequestAdaptor;
+import com.github.ljl.jerrymouse.support.context.IContextManager;
 import com.github.ljl.jerrymouse.support.context.JerryMouseAppContext;
+import com.github.ljl.jerrymouse.support.context.JerryMouseContextManager;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +22,8 @@ import javax.servlet.ServletContext;
 
 public class JerryMouseRequest extends JerryMouseRequestAdaptor {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseRequest.class);
+
+    private IContextManager contextManager = JerryMouseContextManager.get();
 
     public JerryMouseRequest(String method, String url) {
         this.method = method;
@@ -39,6 +45,6 @@ public class JerryMouseRequest extends JerryMouseRequestAdaptor {
 
     @Override
     public ServletContext getServletContext() {
-        return JerryMouseAppContext.get();
+        return contextManager.getServletContext(this);
     }
 }

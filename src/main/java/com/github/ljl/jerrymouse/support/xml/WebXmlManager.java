@@ -1,9 +1,14 @@
 package com.github.ljl.jerrymouse.support.xml;
 
+import com.github.ljl.jerrymouse.annotation.Singleton;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import com.github.ljl.jerrymouse.classloader.IClassLoader;
 import com.github.ljl.jerrymouse.classloader.LocalClassloader;
 import com.github.ljl.jerrymouse.classloader.WebAppClassLoader;
+import com.github.ljl.jerrymouse.support.context.IAppContext;
+import com.github.ljl.jerrymouse.support.context.IContextManager;
+import com.github.ljl.jerrymouse.support.context.JerryMouseAppContext;
+import com.github.ljl.jerrymouse.support.context.JerryMouseContextManager;
 import com.github.ljl.jerrymouse.support.filter.DefaultFilterManager;
 import com.github.ljl.jerrymouse.support.filter.IFilterManager;
 import com.github.ljl.jerrymouse.support.listener.DefaultListenerManager;
@@ -36,19 +41,17 @@ import java.util.Map;
  * @create: 2024-06-23 19:08
  **/
 
+@Singleton
 public class WebXmlManager implements IWebXmlManager {
 
     private static Logger logger = LoggerFactory.getLogger(WebXmlManager.class);
 
-    private IServletManager servletManager = DefaultServletManager.get();
-
-    private IFilterManager filterManager = DefaultFilterManager.get();
-
-    private IListenerManager listenerManager = DefaultListenerManager.get();
+    private IContextManager contextManager = JerryMouseContextManager.get();
 
     private String baseDirStr;
 
     private static WebXmlManager instance;
+
     private WebXmlManager() {
 
     }
@@ -65,14 +68,20 @@ public class WebXmlManager implements IWebXmlManager {
     }
 
     private void loadFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
+        addAppContext(urlPrefix);
         loadServletFromWebXml(urlPrefix, document, classLoader);
         loadFilterFromWebXml(urlPrefix, document, classLoader);
         loadListenerFromWebXml(urlPrefix, document, classLoader);
-        // TODO: other tags
+        // TODO: load other tags
     }
 
-    private void loadServletFromWebXml(String urlPrefix, Document document, IClassLoader servletClassLoader) {
+    private void addAppContext(String urlPrefix) {
+        contextManager.registerServletContext(urlPrefix, new JerryMouseAppContext());
+    }
+    private void loadServletFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
         try {
+            JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
+
             Element rootElement = document.getRootElement();
             List<Element> selectNodes = rootElement.elements("servlet");
             Map<String, String> map = new HashMap<>();
@@ -95,12 +104,13 @@ public class WebXmlManager implements IWebXmlManager {
                 if (map.containsKey(name)) {
                     String className = map.get(name);
                     // 加载class
-                    Class clazz = servletClassLoader.loadClass(className);
+                    Class clazz = classLoader.loadClass(className);
                     HttpServlet httpServlet = (HttpServlet) clazz.newInstance();
                     /**
                      * 3. 注册对应的 url + servlet
                      */
-                    servletManager.register(urlPrefix + urlPattern, httpServlet);
+                    appContext.registerServlet(urlPrefix + urlPattern, httpServlet);
+                    // servletManager.register(urlPrefix + urlPattern, httpServlet);
                 }
             }
         } catch (Exception e) {
@@ -109,8 +119,10 @@ public class WebXmlManager implements IWebXmlManager {
         }
     }
 
-    private void loadFilterFromWebXml(String urlPrefix, Document document, IClassLoader servletClassLoader) {
+    private void loadFilterFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
         try {
+            JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
+
             Element rootElement = document.getRootElement();
             List<Element> selectNodes = rootElement.elements("filter");
             Map<String, String> map = new HashMap<>();
@@ -133,12 +145,13 @@ public class WebXmlManager implements IWebXmlManager {
                 if (map.containsKey(name)) {
                     String className = map.get(name);
                     // 加载class
-                    Class clazz = servletClassLoader.loadClass(className);
+                    Class clazz = classLoader.loadClass(className);
                     Filter filter = (Filter) clazz.newInstance();
                     /**
                      * 3. 注册对应的 url + servlet
                      */
-                    filterManager.register(urlPrefix + urlPattern, filter);
+                    appContext.registerFilter(urlPrefix + urlPattern, filter);
+                    // filterManager.register(urlPrefix + urlPattern, filter);
                 }
             }
         } catch (Exception e) {
@@ -147,8 +160,9 @@ public class WebXmlManager implements IWebXmlManager {
         }
     }
 
-    private void loadListenerFromWebXml(String urlPrefix, Document document, IClassLoader servletClassLoader) {
+    private void loadListenerFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
         try {
+            JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
             Element rootElement = document.getRootElement();
             List<Element> selectNodes = rootElement.elements("listener");
             /**
@@ -156,12 +170,13 @@ public class WebXmlManager implements IWebXmlManager {
              */
             for (Element element : selectNodes) {
                 String className = element.elementText("listener-class");
-                Class clazz = servletClassLoader.loadClass(className);
+                Class clazz = classLoader.loadClass(className);
                 EventListener listener = (EventListener) clazz.newInstance();
                 /**
                  * 2. 注册对应的 urlPrefix + listener
                  */
-                listenerManager.register(urlPrefix, listener);
+                // listenerManager.register(urlPrefix, listener);
+                appContext.registerListener(listener);
             }
         } catch (InstantiationException | IllegalAccessException e) {
             logger.error("[JerryMouse] read web.xml failed", e);

@@ -21,20 +21,8 @@ public class DefaultServletManager implements IServletManager {
 
     protected final Map<String, HttpServlet> servletMap = new HashMap<>();
 
-    private static DefaultServletManager instance;
+    public DefaultServletManager() {}
 
-    private DefaultServletManager() {}
-
-    public static DefaultServletManager get() {
-        if (instance == null) {
-            synchronized (DefaultServletManager.class) {
-                if (instance == null) {
-                    instance = new DefaultServletManager();
-                }
-            }
-        }
-        return instance;
-    }
     @Override
     public void init(String baseDir) {
 
