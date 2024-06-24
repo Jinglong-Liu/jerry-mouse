@@ -6,7 +6,7 @@
 
     <servlet>
         <servlet-name>test</servlet-name>
-        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpTestServlet</servlet-class>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseHttpTestServlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
@@ -16,7 +16,7 @@
 
     <servlet>
         <servlet-name>test2</servlet-name>
-        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpTest2Servlet</servlet-class>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseHttpTest2Servlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
@@ -26,7 +26,7 @@
 
     <servlet>
         <servlet-name>test3</servlet-name>
-        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpServlet</servlet-class>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseHttpServlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
@@ -36,7 +36,7 @@
 
     <servlet>
         <servlet-name>test-filter</servlet-name>
-        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseFilterTestServlet</servlet-class>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseFilterTestServlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
@@ -46,7 +46,7 @@
 
     <filter>
         <filter-name>helloFilter</filter-name>
-        <filter-class>com.github.ljl.jerrymouse.filter.HelloFilter</filter-class>
+        <filter-class>com.github.ljl.jerrymouse.apps.filter.HelloFilter</filter-class>
     </filter>
     <!--剔除/web-demo/-->
     <filter-mapping>
@@ -56,7 +56,7 @@
 
     <filter>
         <filter-name>secondFilter</filter-name>
-        <filter-class>com.github.ljl.jerrymouse.filter.SecondFilter</filter-class>
+        <filter-class>com.github.ljl.jerrymouse.apps.filter.SecondFilter</filter-class>
     </filter>
     <filter-mapping>
         <filter-name>secondFilter</filter-name>

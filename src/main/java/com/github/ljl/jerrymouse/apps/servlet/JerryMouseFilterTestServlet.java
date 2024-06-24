@@ -1,6 +1,5 @@
-package com.github.ljl.jerrymouse.servlet;
+package com.github.ljl.jerrymouse.apps.servlet;
 
-import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,8 +9,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.Writer;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @program: jerry-mouse

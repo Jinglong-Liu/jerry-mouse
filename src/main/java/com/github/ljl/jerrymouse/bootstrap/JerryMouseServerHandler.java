@@ -1,13 +1,11 @@
 package com.github.ljl.jerrymouse.bootstrap;
 
-import com.github.ljl.jerrymouse.bo.RequestInfoBo;
 import com.github.ljl.jerrymouse.dispatcher.IRequestDispatcher;
 import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherContext;
 import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager;
-import com.github.ljl.jerrymouse.dto.IRequest;
-import com.github.ljl.jerrymouse.dto.IResponse;
-import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
-import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
+import com.github.ljl.jerrymouse.impl.dto.IRequest;
+import com.github.ljl.jerrymouse.impl.dto.IResponse;
+import com.github.ljl.jerrymouse.impl.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.utils.JerryMouseRequestUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,7 +28,6 @@ public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
 
     /**
      * 请求分发
-     *
      * @since 0.3.0
      */
     private final IRequestDispatcher requestDispatcher = new RequestDispatcherManager();
@@ -43,10 +40,8 @@ public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
         String requestString = new String(bytes, Charset.defaultCharset());
         logger.info("[JerryMouse] channelRead requestString={}", requestString);
 
-
         // 获取请求信息
-        RequestInfoBo requestInfoBo = JerryMouseRequestUtils.buildRequestInfoBo(requestString);
-        IRequest request = new JerryMouseRequest(requestInfoBo.getMethod(), requestInfoBo.getUrl());
+        IRequest request = JerryMouseRequestUtils.buildRequest(requestString);
         IResponse response = new JerryMouseResponse(context);
 
         // 分发调用

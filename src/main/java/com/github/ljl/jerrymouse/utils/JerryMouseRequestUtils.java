@@ -1,9 +1,7 @@
 package com.github.ljl.jerrymouse.utils;
 
-import com.github.ljl.jerrymouse.bo.RequestInfoBo;
-import com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.github.ljl.jerrymouse.impl.dto.IRequest;
+import com.github.ljl.jerrymouse.impl.dto.JerryMouseRequest;
 
 /**
  * @program: jerry-mouse
@@ -14,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 public class JerryMouseRequestUtils {
 
-    public static RequestInfoBo buildRequestInfoBo(String text) {
+    public static IRequest buildRequest(String text) {
         // 使用正则表达式按行分割请求字符串
         String[] requestLines = text.split("\r\n");
 
@@ -25,6 +23,6 @@ public class JerryMouseRequestUtils {
         String method = strings[0];
         String url = strings[1];
 
-        return new RequestInfoBo(url, method);
+        return new JerryMouseRequest(method, url);
     }
 }

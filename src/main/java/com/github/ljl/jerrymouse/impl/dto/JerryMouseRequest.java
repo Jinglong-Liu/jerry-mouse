@@ -1,7 +1,6 @@
-package com.github.ljl.jerrymouse.dto;
+package com.github.ljl.jerrymouse.impl.dto;
 
-import com.github.ljl.jerrymouse.dto.adaptor.JerryMouseRequestAdaptor;
-import lombok.AllArgsConstructor;
+import com.github.ljl.jerrymouse.impl.dto.adaptor.JerryMouseRequestAdaptor;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,10 +13,13 @@ import org.slf4j.LoggerFactory;
  **/
 
 @Data
-@AllArgsConstructor
 public class JerryMouseRequest extends JerryMouseRequestAdaptor {
     private static Logger logger = LoggerFactory.getLogger(JerryMouseRequest.class);
 
+    public JerryMouseRequest(String method, String url) {
+        this.method = method;
+        this.url = url;
+    }
     private String method;
 
     private String url;

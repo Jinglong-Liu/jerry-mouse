@@ -1,6 +1,6 @@
 package com.github.ljl.jerrymouse.dispatcher;
 
-import com.github.ljl.jerrymouse.dto.IRequest;
+import com.github.ljl.jerrymouse.impl.dto.IRequest;
 import com.github.ljl.jerrymouse.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

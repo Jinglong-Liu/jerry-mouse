@@ -1,4 +1,4 @@
-package com.github.ljl.jerrymouse.dto;
+package com.github.ljl.jerrymouse.impl.dto;
 
 import javax.servlet.http.HttpServletRequest;
 

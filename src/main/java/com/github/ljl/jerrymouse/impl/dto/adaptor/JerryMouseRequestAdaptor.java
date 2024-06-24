@@ -1,6 +1,6 @@
-package com.github.ljl.jerrymouse.dto.adaptor;
+package com.github.ljl.jerrymouse.impl.dto.adaptor;
 
-import com.github.ljl.jerrymouse.dto.IRequest;
+import com.github.ljl.jerrymouse.impl.dto.IRequest;
 
 import javax.servlet.*;
 import javax.servlet.http.*;

@@ -1,4 +1,4 @@
-package com.github.ljl.jerrymouse.servlet;
+package com.github.ljl.jerrymouse.apps.servlet;
 
 import com.github.ljl.jerrymouse.constant.JerryMouseHttpMethodType;
 
