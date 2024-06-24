@@ -1,5 +1,6 @@
 package com.github.ljl.jerrymouse.impl.dto;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 
 public interface IRequest extends HttpServletRequest {
@@ -14,4 +15,11 @@ public interface IRequest extends HttpServletRequest {
      * @return method
      */
     String getMethod();
+
+    /**
+     * 获取 ApplicationContext
+     * @return ApplicationContext
+     */
+    @Override
+    ServletContext getServletContext();
 }

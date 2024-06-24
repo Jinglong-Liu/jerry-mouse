@@ -44,6 +44,16 @@
         <url-pattern>/test-filter</url-pattern>
     </servlet-mapping>
 
+    <servlet>
+        <servlet-name>test-listener-attr</servlet-name>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.TestAttrListenerServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>test-listener-attr</servlet-name>
+        <url-pattern>/test/listener/attr</url-pattern>
+    </servlet-mapping>
+
     <filter>
         <filter-name>helloFilter</filter-name>
         <filter-class>com.github.ljl.jerrymouse.apps.filter.HelloFilter</filter-class>
@@ -62,4 +72,8 @@
         <filter-name>secondFilter</filter-name>
         <url-pattern>/test-filter</url-pattern>
     </filter-mapping>
+
+    <listener>
+        <listener-class>com.github.ljl.jerrymouse.apps.listener.JerryMouseContextAttributeListener</listener-class>
+    </listener>
 </web-app>

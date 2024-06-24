@@ -6,6 +6,8 @@ import com.github.ljl.jerrymouse.classloader.LocalClassloader;
 import com.github.ljl.jerrymouse.classloader.WebAppClassLoader;
 import com.github.ljl.jerrymouse.support.filter.DefaultFilterManager;
 import com.github.ljl.jerrymouse.support.filter.IFilterManager;
+import com.github.ljl.jerrymouse.support.listener.DefaultListenerManager;
+import com.github.ljl.jerrymouse.support.listener.IListenerManager;
 import com.github.ljl.jerrymouse.support.servlet.DefaultServletManager;
 import com.github.ljl.jerrymouse.support.servlet.IServletManager;
 import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
@@ -22,6 +24,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.EventListener;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +43,8 @@ public class WebXmlManager implements IWebXmlManager {
     private IServletManager servletManager = DefaultServletManager.get();
 
     private IFilterManager filterManager = DefaultFilterManager.get();
+
+    private IListenerManager listenerManager = DefaultListenerManager.get();
 
     private String baseDirStr;
 
@@ -62,7 +67,8 @@ public class WebXmlManager implements IWebXmlManager {
     private void loadFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
         loadServletFromWebXml(urlPrefix, document, classLoader);
         loadFilterFromWebXml(urlPrefix, document, classLoader);
-        // TODO: listener and other tags
+        loadListenerFromWebXml(urlPrefix, document, classLoader);
+        // TODO: other tags
     }
 
     private void loadServletFromWebXml(String urlPrefix, Document document, IClassLoader servletClassLoader) {
@@ -136,6 +142,28 @@ public class WebXmlManager implements IWebXmlManager {
                 }
             }
         } catch (Exception e) {
+            logger.error("[JerryMouse] read web.xml failed", e);
+            e.printStackTrace();
+        }
+    }
+
+    private void loadListenerFromWebXml(String urlPrefix, Document document, IClassLoader servletClassLoader) {
+        try {
+            Element rootElement = document.getRootElement();
+            List<Element> selectNodes = rootElement.elements("listener");
+            /**
+             * 1, 找到所有的listener标签，找到listener-class
+             */
+            for (Element element : selectNodes) {
+                String className = element.elementText("listener-class");
+                Class clazz = servletClassLoader.loadClass(className);
+                EventListener listener = (EventListener) clazz.newInstance();
+                /**
+                 * 2. 注册对应的 urlPrefix + listener
+                 */
+                listenerManager.register(urlPrefix, listener);
+            }
+        } catch (InstantiationException | IllegalAccessException e) {
             logger.error("[JerryMouse] read web.xml failed", e);
             e.printStackTrace();
         }

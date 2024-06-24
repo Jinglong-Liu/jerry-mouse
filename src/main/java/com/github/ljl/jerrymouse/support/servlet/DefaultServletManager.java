@@ -27,7 +27,7 @@ public class DefaultServletManager implements IServletManager {
 
     public static DefaultServletManager get() {
         if (instance == null) {
-            synchronized (JerryMouseThreadPoolUtil.class) {
+            synchronized (DefaultServletManager.class) {
                 if (instance == null) {
                     instance = new DefaultServletManager();
                 }

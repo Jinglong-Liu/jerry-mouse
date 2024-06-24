@@ -1637,3 +1637,160 @@ git commit
 [web-demo] 0.6.1 add filter filterChain
 tag -a v0.6.2 -m "add filter filterChain"
 ```
+
+## 7、Listener
+
+顾名思义，监听器，在监听到某些事件发生时，执行一些后置操作
+有以下类型
+```
+javax.servlet包下监听接口:
+ServletContextListener          //监听ServletContext对象的状态
+ServletContextAttributeListener //监听ContextAttribute中数据状态
+ServetRequestListener           //监听ServetRequest的状态
+ServletRequestAttributeListener //监听RequestAttribute中数据状态
+
+javax.servlet.http包下监听接口:
+HttpSessionListener             //监听HttpSession会话的状态
+HttpSessionAttributeListener    //监听session域中的数据状态
+HttpSessionBindingListener    (该监听器不需要配置xml或使用注解)//目标类实现该监听器，则监听该类是否有数据绑定
+HttpSessionldListener           //监听session的Id状态
+HttpSessionActivationListener   //监听session的存储状态（内存存储到硬盘, 硬盘到内存，又称钝化，活化）
+```
+
+下面以ServletContextAttribute为例
+
+[ServletContextAttributeListener 文档](https://tomcat.apache.org/tomcat-7.0-doc/servletapi/javax/servlet/ServletContextAttributeListener.html)
+
+```
+void	attributeAdded(ServletContextAttributeEvent scae)
+Notification that a new attribute was added to the servlet context.
+void	attributeRemoved(ServletContextAttributeEvent scae)
+Notification that an existing attribute has been removed from the servlet context.
+void	attributeReplaced(ServletContextAttributeEvent scae)
+Notification that an attribute on the servlet context has been replaced.
+```
+
+写一个Listener Demo, 看下有什么是需要Tomcat处理的
+```java
+public class JerryMouseContextAttributeListener implements ServletContextAttributeListener {
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseContextAttributeListener.class);
+
+    @Override
+    public void attributeAdded(ServletContextAttributeEvent event) {
+        logger.info("[JerryMouse] ContextAttribute added + {}", event);
+    }
+
+    @Override
+    public void attributeRemoved(ServletContextAttributeEvent event) {
+        logger.info("[JerryMouse] ContextAttribute removed + {}", event);
+    }
+
+    @Override
+    public void attributeReplaced(ServletContextAttributeEvent event) {
+        logger.info("[JerryMouse] ContextAttribute replaced + {}", event);
+    }
+}
+```
+看下`ServletContextAttributeEvent` 这个类是个啥
+![ServletContextAttributeEvent](./images/v0.7/ServletContextAttributeEvent.png)
+
+就是对ServletContext的封装
+
+ServletContext 是一个接口，是需要Tomcat容易帮忙实现的
+
+再次理解Servlet容器的含义
+
+[Tomcat中的Context实现](https://github.com/apache/tomcat/blob/main/java/org/apache/catalina/core/ApplicationContext.java)
+
+ServletContext 如何得到并使用？
+```java
+public class RequestServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        ServletContext context = req.getServletContext();
+        String appName = context.getParameter("applicationName");
+        resp.getWriter().write("Application Name: " + appName);
+    }
+}
+```
+
+全局一份context，因此照旧用单例处理即可，不难实现
+
+```
+// TODO
+tomcat可以同时部署多个webapp，每个webapp, servletContext唯一，也就是每个web.xml对应一份context, 在加载web.xml时应该区别
+但实际上，之前处理servlet, listener，都存储到单例中，其实是不合适的，每个web.xml只能管理本身的servlet，不应该管理到其他的servlet
+目前仍然采用单例的模式，后续做改进
+```
+
+Listener和FilterChain一样，源码太长不想看，我们从本次需求出发，写出满足要求的最小实现。
+
+例如，本次需求只要求可以运行实现上面的`JerryMouseContextAttributeListener`的功能
+
+写一个子接口
+```java
+public interface IAppContext {
+    Object getAttribute(String name);
+
+    Enumeration<String> getAttributeNames();
+}
+```
+首先，JerryMouse启动时，读取web.xml，解析listener并注册
+
+这步和之前的Servlet, Filter一模一样，不再赘述
+
+注册到context中，然后context的get/set/remove attribute接口，在执行相应的操作后，遍历所有的`ContextAttributeListener`,执行其attributeAdded等方法，并把context封装成event传入即可
+
+如此简单就实现了最基础的Listener适配
+
+测试（本地servlet测试）
+
+```java
+public class TestAttrListenerServlet extends HttpServlet {
+    private static Logger logger = LoggerFactory.getLogger(TestAttrListenerServlet.class);
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        ServletContext context = req.getServletContext();
+        String key = "man";
+        logger.info("[JerryMouse] before attr set");
+        context.setAttribute(key, "What can I say");
+        logger.info("[JerryMouse] after set man");
+        context.setAttribute(key, "Tomcat out!");
+        logger.info("[JerryMouse] after replace man");
+        final String attribute = (String) context.getAttribute(key);
+        logger.info("[JerryMouse] get key={}, value={}", key, attribute);
+        context.removeAttribute(key);
+        logger.info("[JerryMouse] after remove man");
+        logger.info("[JerryMouse] get value = {}", context.getAttribute(key));
+        resp.getWriter().print(JerryMouseHttpUtils.http200Resp(attribute));
+        resp.flushBuffer();
+    }
+}
+```
+
+```bash
+> mvn clean install
+> GET http://127.0.0.1:8080/test/listener/attr
+控制台:
+2024-06-24 15:43:05 INFO  HelloFilter:22 - [JerryMouse] Request received HelloFilter
+2024-06-24 15:43:05 INFO  TestAttrListenerServlet:29 - [JerryMouse] before attr set
+2024-06-24 15:43:05 INFO  JerryMouseContextAttributeListener:22 - [JerryMouse] ContextAttribute added name=man, value=What can I say
+2024-06-24 15:43:05 INFO  TestAttrListenerServlet:31 - [JerryMouse] after set man
+2024-06-24 15:43:05 INFO  JerryMouseContextAttributeListener:32 - [JerryMouse] ContextAttribute replaced name=man, value=Tomcat out!
+2024-06-24 15:43:05 INFO  TestAttrListenerServlet:33 - [JerryMouse] after replace man
+2024-06-24 15:43:05 INFO  TestAttrListenerServlet:35 - [JerryMouse] get key=man, value=Tomcat out!
+2024-06-24 15:43:05 INFO  JerryMouseContextAttributeListener:27 - [JerryMouse] ContextAttribute removed name=man, value=Tomcat out!
+2024-06-24 15:43:05 INFO  TestAttrListenerServlet:37 - [JerryMouse] after remove man
+2024-06-24 15:43:05 INFO  TestAttrListenerServlet:38 - [JerryMouse] get value = null
+2024-06-24 15:43:05 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+2024-06-24 15:43:05 INFO  HelloFilter:26 - [JerryMouse] Response sent HelloFilter
+返回:
+Tomcat out!
+```
+
+git commit
+```bash
+[jerry-mouse] v0.7.0 add attribute listener
+git tag -a v0.7.0 -m "v0.7.0 add attribute listener"
+```

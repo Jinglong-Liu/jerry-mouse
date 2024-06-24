@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Diagram>
+  <ID>JAVA</ID>
+  <OriginalElement>javax.servlet.ServletContextAttributeEvent</OriginalElement>
+  <nodes>
+    <node x="70.5" y="254.0">javax.servlet.ServletContextEvent</node>
+    <node x="0.0" y="382.0">javax.servlet.ServletContextAttributeEvent</node>
+    <node x="139.5" y="0.0">java.io.Serializable</node>
+    <node x="118.5" y="78.0">java.util.EventObject</node>
+  </nodes>
+  <notes />
+  <edges>
+    <edge source="javax.servlet.ServletContextAttributeEvent" target="javax.servlet.ServletContextEvent" relationship="GENERALIZATION">
+      <point x="0.0" y="-74.0" />
+      <point x="0.0" y="39.0" />
+    </edge>
+    <edge source="javax.servlet.ServletContextEvent" target="java.util.EventObject" relationship="GENERALIZATION">
+      <point x="0.0" y="-39.0" />
+      <point x="0.0" y="63.0" />
+    </edge>
+    <edge source="java.util.EventObject" target="java.io.Serializable" relationship="REALIZATION">
+      <point x="0.0" y="-63.0" />
+      <point x="0.0" y="14.0" />
+    </edge>
+  </edges>
+  <settings layout="Hierarchic" zoom="1.0" showDependencies="false" x="204.0" y="265.0" />
+  <SelectedNodes />
+  <Categories>
+    <Category>Constructors</Category>
+    <Category>Fields</Category>
+    <Category>Inner Classes</Category>
+    <Category>Methods</Category>
+    <Category>Properties</Category>
+  </Categories>
+  <SCOPE>All</SCOPE>
+  <VISIBILITY>private</VISIBILITY>
+</Diagram>
+
