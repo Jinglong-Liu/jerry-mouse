@@ -4,6 +4,8 @@ import com.github.ljl.jerrymouse.impl.dto.IRequest;
 import com.github.ljl.jerrymouse.impl.dto.IResponse;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import com.github.ljl.jerrymouse.impl.JerryMouseFilterChain;
+import com.github.ljl.jerrymouse.support.context.RequestDispatcherContext;
+import com.github.ljl.jerrymouse.support.filter.IFilterManager;
 import com.github.ljl.jerrymouse.support.servlet.IServletManager;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import org.slf4j.Logger;
@@ -35,10 +37,10 @@ public class ServletRequestDispatcher implements IRequestDispatcher {
         IRequest request = context.getRequest();
         IResponse response = context.getResponse();
         IServletManager servletManager = context.getServletManager();
-
+        IFilterManager filterManager = context.getFilterManager();
         // 找到注册好的相应的 servlet 和 List<Filter>
         String requestUrl = request.getUrl();
-        List<Filter> filters = context.getFilterManager().getMatchFilters(requestUrl);
+        List<Filter> filters = filterManager.getMatchFilters(requestUrl);
         HttpServlet httpServlet = servletManager.getServlet(requestUrl);
         if(Objects.isNull(httpServlet)) {
             logger.warn("[JerryMouse] requestUrl={} mapping not found", requestUrl);

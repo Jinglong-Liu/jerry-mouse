@@ -17,7 +17,7 @@ import java.util.Set;
  * @create: 2024-06-24 10:40
  **/
 
-public class JerryMouseContextAdaptor implements ServletContext {
+public abstract class JerryMouseContextAdaptor implements ServletContext {
     @Override
     public String getContextPath() {
         return null;

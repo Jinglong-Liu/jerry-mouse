@@ -22,7 +22,7 @@ public interface IListenerManager {
     /**
      * 注册 listener
      *
-     * @param UrlPrefix
+     * @param urlPrefix
      * @param listener
      * @since 0.7.0
      */

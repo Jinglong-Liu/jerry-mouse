@@ -61,7 +61,7 @@
     <!--剔除/web-demo/-->
     <filter-mapping>
         <filter-name>helloFilter</filter-name>
-        <url-pattern>^(?!/web-demo/).*</url-pattern>
+        <url-pattern>/.*</url-pattern>
     </filter-mapping>
 
     <filter>

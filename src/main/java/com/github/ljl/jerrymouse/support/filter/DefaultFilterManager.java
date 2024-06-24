@@ -18,28 +18,16 @@ public class DefaultFilterManager implements IFilterManager {
 
     protected final Map<String, Filter> filterMap = new HashMap<>();
 
-    private static DefaultFilterManager instance;
+    public DefaultFilterManager() {}
 
-    private DefaultFilterManager() {}
-
-    public static DefaultFilterManager get() {
-        if (instance == null) {
-            synchronized (DefaultFilterManager.class) {
-                if (instance == null) {
-                    instance = new DefaultFilterManager();
-                }
-            }
-        }
-        return instance;
-    }
     @Override
     public void init(String baseDir) {
 
     }
 
     @Override
-    public void register(String url, Filter filter) {
-        filterMap.put(url, filter);
+    public void register(String urlPattern, Filter filter) {
+        filterMap.put(urlPattern, filter);
     }
 
     @Override

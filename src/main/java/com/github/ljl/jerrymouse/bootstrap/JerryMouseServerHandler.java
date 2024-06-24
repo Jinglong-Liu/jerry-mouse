@@ -1,17 +1,22 @@
 package com.github.ljl.jerrymouse.bootstrap;
 
 import com.github.ljl.jerrymouse.dispatcher.IRequestDispatcher;
-import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherContext;
+import com.github.ljl.jerrymouse.support.context.RequestDispatcherContext;
 import com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager;
 import com.github.ljl.jerrymouse.impl.dto.IRequest;
 import com.github.ljl.jerrymouse.impl.dto.IResponse;
 import com.github.ljl.jerrymouse.impl.dto.JerryMouseResponse;
+import com.github.ljl.jerrymouse.support.context.IContextManager;
+import com.github.ljl.jerrymouse.support.context.JerryMouseAppContext;
+import com.github.ljl.jerrymouse.support.context.JerryMouseContextManager;
 import com.github.ljl.jerrymouse.utils.JerryMouseRequestUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.servlet.ServletContext;
 import java.nio.charset.Charset;
 
 /**
@@ -31,6 +36,8 @@ public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
      */
     private final IRequestDispatcher requestDispatcher = new RequestDispatcherManager();
 
+    private final IContextManager contextManager = JerryMouseContextManager.get();
+
     @Override
     public void channelRead(ChannelHandlerContext context, Object msg) throws Exception {
         ByteBuf buf = (ByteBuf) msg;
@@ -43,8 +50,11 @@ public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
         IRequest request = JerryMouseRequestUtils.buildRequest(requestString);
         IResponse response = new JerryMouseResponse(context);
 
+        ServletContext appContext = contextManager.getServletContext(request);
+        // 解析url， 匹配对应的ApplicationContext
         // 分发调用
         final RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();
+        dispatcherContext.setAppContext((JerryMouseAppContext) appContext);
         dispatcherContext.setRequest(request);
         dispatcherContext.setResponse(response);
         requestDispatcher.dispatch(dispatcherContext);

@@ -1,11 +1,17 @@
 package com.github.ljl.jerrymouse.support.context;
 
+import com.github.ljl.jerrymouse.support.filter.DefaultFilterManager;
+import com.github.ljl.jerrymouse.support.filter.IFilterManager;
 import com.github.ljl.jerrymouse.support.listener.DefaultListenerManager;
 import com.github.ljl.jerrymouse.support.listener.IListenerManager;
+import com.github.ljl.jerrymouse.support.servlet.DefaultServletManager;
+import com.github.ljl.jerrymouse.support.servlet.IServletManager;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
+import javax.servlet.http.HttpServlet;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -22,22 +28,17 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
 
     private Map<String, Object> attributes = new ConcurrentHashMap<>();
 
-    private IListenerManager listenerManager = DefaultListenerManager.get();
+    @Getter
+    private IListenerManager listenerManager = new DefaultListenerManager();
 
-    private JerryMouseAppContext() {
+    @Getter
+    private IFilterManager filterManager = new DefaultFilterManager();
 
-    }
-    private static JerryMouseAppContext instance;
+    @Getter
+    private IServletManager servletManager = new DefaultServletManager();
 
-    public static JerryMouseAppContext get() {
-        if (Objects.isNull(instance)) {
-            synchronized (JerryMouseAppContext.class) {
-                if (Objects.isNull(instance)) {
-                    instance = new JerryMouseAppContext();
-                }
-            }
-        }
-        return instance;
+    public JerryMouseAppContext() {
+
     }
 
     @Override
@@ -49,6 +50,21 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
     public Enumeration<String> getAttributeNames() {
         Set<String> names = new HashSet<>(attributes.keySet());
         return Collections.enumeration(names);
+    }
+
+    @Override
+    public void registerServlet(String urlPattern, Servlet servlet) {
+        servletManager.register(urlPattern, (HttpServlet) servlet);
+    }
+
+    @Override
+    public void registerFilter(String urlPattern, Filter filter) {
+        filterManager.register(urlPattern, filter);
+    }
+
+    @Override
+    public void registerListener(EventListener listener) {
+        listenerManager.register("", listener);
     }
 
     @Override

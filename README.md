@@ -1794,3 +1794,139 @@ git commit
 [jerry-mouse] v0.7.0 add attribute listener
 git tag -a v0.7.0 -m "v0.7.0 add attribute listener"
 ```
+
+## 7.1 webapp 间 context 隔离
+
+需求:
+JerryMouse运行多个webapp, 不同webapp间的listener，filter不要互相影响
+
+其实之前测试filter时，就有这个问题：通配符匹配问题。
+
+如果说servlet，可以根据不同的app，根据不同的前缀进行区分，那么涉及通配符问题，
+我要求一个filter可以filter当前这个web.xml中的servlet，但其他的web.xml不受影响
+。。好像也可以用前缀区分。但是假如JerryMouse本身测试的servlet，没有前缀，又该如何应对
+
+```
+/.*
+```
+这个会把其他的webapp也包括在内
+
+因为这个逻辑是我们自己实现的，用了单例的manager管理，没有区分
+
+如果说filter还能勉强忍受这个问题（不使用通配符），那么listener的引入，将P1的bug升级为P0
+
+```xml
+<listener>
+        <listener-class>com.github.ljl.jerrymouse.apps.listener.JerryMouseContextAttributeListener</listener-class>
+</listener>
+```
+
+如果还都放到一个容器内不加区分，那么listener将会管到所有的webapp，显然是不符合预期的
+
+如何区分呢
+
+笔者想到两种方式
+
+1、context仍然使用单例，注册的时候，带上标识符作为前缀，获取的时候，用前缀过滤
+
+2、一个web.xml一个context，获取context时，用标识符区分
+
+实现思路其实类似，思路1稍容易，但此处采用思路2，这也是tomcat的方案。
+
+抛开Tomcat的实现不谈(Tomcat out!) 我们自己简要设计一下。
+
+我们让每个webapp对应一个context, 每个context里面存放一个ServletManager, FilterManage, ListenerManager 用于管理当前的webapp对应的组件
+
+而另外设置一个单例ContextManager, 用于管理所有的context。
+
+定义接口
+```java
+public interface IContextManager {
+
+    ServletContext getServletContext(String name);
+
+    void registerServletContext(String name, ServletContext context);
+}
+```
+
+显然，在JerryMouse启动，解析不同webapp的web.xml时注册
+
+观察javax.servlet.ServletContext接口，我们发现，类似addServlet之类的接口，返回类型是ServletRegistration.Dynamic类型，这实际上是动态添加的接口，并不是传统的静态的注册web.xml用的接口
+
+因此暂时无需实现这些接口，根据需要自定义接口即可
+
+不难想到的一种实现如下
+
+[uml](./uml/jerrymouse-v0.7.1.1.puml)
+
+![img](./images/v0.7/jerrymouse-v0.7.1.1_context-0.png)
+
+注意这些manager有且只有`WebXmlManager`和`JerryMouseContextManager`是单例
+
+流程梳理：
+
+启动：
+- 1、启动，WebXmlManager负责加载webapps的xml和本地的xml，以urlPrefix为前key识不同的webapp(本地默认为空串)
+- 2、JerryMouseContextManager 为每个key创建新的AppContext
+- 3、然后加载xml中的servlet, filter, listener, 注册时，先通过urlPrefix拿到web.xml对应的AppContext，然后使用对应AppContext进行注册
+
+
+请求：
+- 4、获取url，根据urlPrefix获取对应的AppContext
+- 5、Request中存放一个JerryMouseContextManager manager单例, 必要时通过manager.get(this) 获取对应appContext进行操作
+
+
+测试
+```bash
+> 修改本地web.xml, 让helloFilter匹配全部
+<filter-mapping>
+        <filter-name>helloFilter</filter-name>
+        <url-pattern>/.*</url-pattern>
+</filter-mapping>
+
+> mvn clean install
+
+testcase1: 测试本地servlet, 确定走helloFilter
+> GET http://127.0.0.1:8080/test3
+控制台:
+2024-06-24 21:59:35 INFO  HelloFilter:22 - [JerryMouse] Request received HelloFilter
+2024-06-24 21:59:35 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+2024-06-24 21:59:35 INFO  HelloFilter:26 - [JerryMouse] Response sent HelloFilter
+返回:
+HttpServlet-get using stream
+
+走helloFilter, 符合预期
+
+testcase2: 测试web-demo的请求,观察是否也会走helloFilter
+
+> GET http://127.0.0.1:8080/web-demo/index
+控制台:
+[web-demo] Before web-demo FirstFilter
+[web-demo] Before web-demo SecondFilter
+2024-06-24 21:58:44 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+[web-demo] After web-demo SecondFilter
+[web-demo] After web-demo FirstFilter
+返回:
+servlet index get
+
+不走helloFilter, 符合预期
+
+```
+
+至此，实现了context的隔离，可以多测试一些用例，确保基本的Servlet, Filter, Listener 功能正确
+
+__阶段总结:__
+
+- 一个webapp对应一个appContext
+- contextManager单例管理所有的appContext
+- 实现从request获取对应appContext的接口getServletContext
+- 启动时，加载web.xml, 通过项目名urlPrefix注册新的appContext，将servlet, filter, listener 等组件注册到对应的appContext中
+- 请求时，根据url获得对应的context, 再根据url获得对应的servlet等组件
+- 实现效果: listener, filter仅对当前app(web.xml)的servlet生效
+
+git commit
+```bash
+jerry-mouse: [jerry-mouse] v0.7.1 separate AppContext
+git tag -a v0.7.1 -m "v0.7.1 separate AppContext"
+web-demo:       [web-demo] v0.7.1 separate AppContext
+```
