@@ -1,4 +1,4 @@
-package com.github.ljl.jerrymouse.support.classloader;
+package com.github.ljl.jerrymouse.classloader;
 
 /**
  * @program: jerry-mouse
@@ -7,7 +7,7 @@ package com.github.ljl.jerrymouse.support.classloader;
  * @create: 2024-06-22 14:12
  **/
 
-public class LocalClassloader implements IClassLoader {
+public class LocalClassloader extends ClassLoader implements IClassLoader {
     @Override
     public Class loadClass(String className) {
         try {

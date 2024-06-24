@@ -1,29 +1,26 @@
-package com.github.ljl.jerrymouse.servlet;
+package com.github.ljl.jerrymouse.apps.servlet;
 
-import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
-import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
+import com.github.ljl.jerrymouse.impl.dto.JerryMouseResponse;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.nio.channels.ClosedChannelException;
 
 /**
  * @program: jerry-mouse
  * @description:
  * @author: ljl
- * @create: 2024-06-20 18:32
+ * @create: 2024-06-21 10:52
  **/
 
-public class JerryMouseHttpTestServlet extends AbstractJerryMouseServlet {
-
-    private static Logger logger = LoggerFactory.getLogger(JerryMouseHttpTestServlet.class);
+public class JerryMouseHttpTest2Servlet extends AbstractJerryMouseServlet {
+    private static Logger logger = LoggerFactory.getLogger(JerryMouseHttpTest2Servlet.class);
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
-        String content = "JerryMouseHttpTestServlet-get";
+        String content = "JerryMouseHttpTestServlet2-get";
 
         JerryMouseResponse response = (JerryMouseResponse) resp;
         response.write(JerryMouseHttpUtils.http200Resp(content));
@@ -31,7 +28,7 @@ public class JerryMouseHttpTestServlet extends AbstractJerryMouseServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
-        String content = "JerryMouseHttpTestServlet-post";
+        String content = "JerryMouseHttpTestServlet2-post";
 
         JerryMouseResponse response = (JerryMouseResponse) resp;
         response.write(JerryMouseHttpUtils.http200Resp(content));

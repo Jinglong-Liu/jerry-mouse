@@ -1,6 +1,6 @@
-package com.github.ljl.jerrymouse.dto.adaptor;
+package com.github.ljl.jerrymouse.impl.dto.adaptor;
 
-import com.github.ljl.jerrymouse.dto.IResponse;
+import com.github.ljl.jerrymouse.impl.dto.IResponse;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;

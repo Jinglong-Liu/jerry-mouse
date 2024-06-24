@@ -1,10 +1,8 @@
 package com.github.ljl.jerrymouse.dispatcher;
 
 import com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap;
-import com.github.ljl.jerrymouse.dto.IRequest;
-import com.github.ljl.jerrymouse.dto.IResponse;
-import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
-import com.github.ljl.jerrymouse.dto.JerryMouseResponse;
+import com.github.ljl.jerrymouse.impl.dto.IRequest;
+import com.github.ljl.jerrymouse.impl.dto.IResponse;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import com.github.ljl.jerrymouse.utils.JerryMouseFileUtils;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;

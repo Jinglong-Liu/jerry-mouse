@@ -1,4 +1,4 @@
-package com.github.ljl.jerrymouse.support.classloader;
+package com.github.ljl.jerrymouse.classloader;
 
 import com.github.ljl.jerrymouse.utils.JerryMouseFileUtils;
 

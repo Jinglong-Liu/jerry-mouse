@@ -1,9 +1,9 @@
 package com.github.ljl.jerrymouse.dispatcher;
 
-import com.github.ljl.jerrymouse.dto.IRequest;
-import com.github.ljl.jerrymouse.dto.IResponse;
+import com.github.ljl.jerrymouse.impl.dto.IRequest;
+import com.github.ljl.jerrymouse.impl.dto.IResponse;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
-import com.github.ljl.jerrymouse.support.filter.JerryMouseFilterChain;
+import com.github.ljl.jerrymouse.impl.JerryMouseFilterChain;
 import com.github.ljl.jerrymouse.support.servlet.IServletManager;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import org.slf4j.Logger;

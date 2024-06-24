@@ -1,0 +1,355 @@
+@startuml
+
+left to right direction
+
+
+
+class jerrymouse.apps.filter.HelloFilter {
++ void doFilter(ServletRequest,ServletResponse,FilterChain)
+}
+
+class jerrymouse.apps.filter.SecondFilter {
++ void doFilter(HttpServletRequest,HttpServletResponse,FilterChain)
+}
+
+class io.netty.channel.ChannelInboundHandlerAdapter {
+}
+
+interface javax.servlet.http.HttpServletRequest {
+}
+interface javax.servlet.http.HttpServletResponse {
+}
+abstract class javax.servlet.http.HttpServlet {
+}
+abstract class javax.servlet.http.HttpFilter {
++ void doFilter(ServletRequest, ServletResponse, FilterChain)
+}
+
+abstract class jerrymouse.impl.dto.adaptor.JerryMouseRequestAdaptor {
+
+}
+
+class jerrymouse.apps.servlet.JerryMouseHttpTestServlet {
+# void doGet(HttpServletRequest,HttpServletResponse)
+# void doPost(HttpServletRequest,HttpServletResponse)
+}
+
+interface jerrymouse.impl.dto.IRequest {
+~ String getUrl()
+~ String getMethod()
+}
+
+class jerrymouse.apps.servlet.JerryMouseHttpTest2Servlet {
+# void doGet(HttpServletRequest,HttpServletResponse)
+# void doPost(HttpServletRequest,HttpServletResponse)
+}
+
+
+abstract class jerrymouse.impl.dto.adaptor.JerryMouseResponseAdaptor {
+
+}
+
+class jerrymouse.impl.JerryMouseFilterChain {
+- Servlet servlet
+- List<Filter> filters
+- int pos
++ void doFilter(ServletRequest,ServletResponse)
+}
+
+
+interface jerrymouse.support.filter.IFilterManager {
+~ void init(String)
+~ void register(String,Filter)
+~ Filter getFilter(String)
+~ List<Filter> getMatchFilters(String)
+}
+
+class jerrymouse.support.filter.DefaultFilterManager << singleton >> {
+# Map<String,Filter> filterMap
++ void init(String)
++ void register(String,Filter)
++ Filter getFilter(String)
++ List<Filter> getMatchFilters(String)
+}
+
+class jerrymouse.support.war.WarExtractor {
++ void extract(String)
+- void handleWarFile(String,File)
++ {static} void extractWar(String,String)
+- {static} void extractFile(ZipInputStream,String)
+}
+
+
+abstract class jerrymouse.apps.servlet.AbstractJerryMouseServlet {
+# {abstract}void doGet(HttpServletRequest,HttpServletResponse)
+# {abstract}void doPost(HttpServletRequest,HttpServletResponse)
+# void service(HttpServletRequest,HttpServletResponse)
+}
+
+class jerrymouse.impl.dto.JerryMouseResponseHelper {
+- JerryMouseResponse response
+- StringWriter stringWriter
+- PrintWriter writer
+- ServletOutputStream outputStream
++ ServletOutputStream getOutputStream()
++ PrintWriter getWriter()
++ void flushBuffer()
+
+}
+
+
+class jerrymouse.impl.dto.JerryMouseResponseHelper$OutputStreamHelper {
+- JerryMouseResponse response
++ boolean isReady()
++ void setWriteListener(WriteListener)
++ void write(int)
++ void print(String)
+}
+
+
+class jerrymouse.impl.dto.JerryMouseResponseHelper$ByteArrayServletOutputStream {
+- ByteArrayOutputStream byteArrayOutputStream
++ void write(int)
++ boolean isReady()
++ void setWriteListener(WriteListener)
++ byte[] toByteArray()
++ void flush()
+}
+
+interface jerrymouse.support.servlet.IServletManager {
+~ void init(String)
+~ void register(String,HttpServlet)
+~ HttpServlet getServlet(String)
+}
+
+abstract class jerrymouse.impl.dto.ServletOutputStream <<  javax.servlet >>{
+}
+
+interface javax.servlet.FilterChain {
++ void doFilter(ServletRequest, ServletResponse)
+}
+
+class jerrymouse.utils.StringUtil {
++ {static} String EMPTY
++ {static} boolean isEmpty(String)
++ {static} boolean isEmptyTrim(String)
+}
+
+
+class jerrymouse.utils.JerryMouseHttpUtils {
++ {static} String http200Resp(String)
++ {static} String http404Resp()
++ {static} String http500Resp()
++ {static} String http500Resp(Exception)
+}
+
+class jerrymouse.utils.JerryMouseRequestUtils {
++ {static} IRequest buildRequest(String)
+}
+
+class jerrymouse.utils.JerryMouseResourceUtils {
+- {static} String os
++ {static} String getClassRootResource(Class<?>)
++ {static} String buildFullPath(String,String)
+}
+
+
+class jerrymouse.utils.JerryMouseFileUtils {
++ {static} String getFileContent(String)
++ {static} String getFileName(String)
++ {static} void deleteFileRecursive(File)
++ {static} void deleteFileRecursive(String)
++ {static} boolean createFile(String)
++ {static} boolean notExists(File)
++ {static} boolean exists(String,LinkOption)
+}
+
+
+class jerrymouse.bootstrap.JerryMouseServerHandler {
+- IRequestDispatcher requestDispatcher
++ void channelRead(ChannelHandlerContext,Object)
++ void channelReadComplete(ChannelHandlerContext)
++ void exceptionCaught(ChannelHandlerContext,Throwable)
+}
+
+
+class jerrymouse.support.threadpool.JerryMouseThreadPoolUtil << singleton >> {
+- {static} ExecutorService executor
+- {static} int CAPACITY
+- {static} int CORE_POOL_SIZE
+- {static} int MAX_POOL_SIZE
+- {static} long KEEP_ALIVE_TIME
++ void execute(Runnable)
++ void submit(Runnable)
++ void shutdown()
+}
+
+interface jerrymouse.support.war.IWarExtractor {
+~ void extract(String)
+}
+
+class jerrymouse.support.xml.WebXmlManager << singleton >> {
+- IServletManager servletManager
+- IFilterManager filterManager
+- String baseDirStr
++ void parseWebappXml(String)
++ void parseLocalWebXml()
+- void loadFromWebXml(String,Document,IClassLoader)
+- void loadServletFromWebXml(String,Document,IClassLoader)
+- void loadFilterFromWebXml(String,Document,IClassLoader)
+- void loadAndRegisterWebapps(String,String,File,File)
+}
+
+class jerrymouse.bootstrap.JerryMouseBootstrap {
+- {static} String LOCAL_HOST
+- {static} int DEFAULT_PORT
+- int port
+- JerryMouseThreadPoolUtil threadPool
+- String baseDir
+- IWarExtractor warExtractor
+- IRequestDispatcher requestDispatcher
+- IWebXmlManager webXmlManager
++ void start()
+- void before()
+}
+
+
+
+
+class jerrymouse.support.servlet.DefaultServletManager << singleton >> {
+# Map<String,HttpServlet> servletMap
++ void init(String)
++ void register(String,HttpServlet)
++ HttpServlet getServlet(String)
+}
+
+interface jerrymouse.impl.dto.IResponse {
+~ void write(String,String)
+~ void write(String)
+}
+
+class jerrymouse.impl.dto.JerryMouseRequest  << (D,orchid) @Data >> {
+- String method
+- String url
+}
+
+class jerrymouse.apps.servlet.JerryMouseFilterTestServlet {
+# void doGet(HttpServletRequest,HttpServletResponse)
+}
+
+
+class jerrymouse.impl.dto.JerryMouseResponse {
+- ChannelHandlerContext context
+- HttpServletResponse helper
++ void write(String,String)
++ PrintWriter getWriter()
++ ServletOutputStream getOutputStream()
++ void flushBuffer()
+}
+
+class jerrymouse.exception.JerryMouseException {
+}
+class jerrymouse.apps.servlet.JerryMouseHttpServlet {
+# void doGet(HttpServletRequest,HttpServletResponse)
+# void doPost(HttpServletRequest,HttpServletResponse)
+}
+
+
+interface jerrymouse.support.xml.IWebXmlManager {
+~ void parseWebappXml(String)
+~ void parseLocalWebXml()
+}
+
+
+interface jerrymouse.dispatcher.IRequestDispatcher {
+~ void dispatch(RequestDispatcherContext)
+}
+
+class jerrymouse.dispatcher.ServletRequestDispatcher {
++ void dispatch(RequestDispatcherContext)
+~ void filter(Servlet,List<Filter>,HttpServletRequest,HttpServletResponse)
+}
+
+class jerrymouse.dispatcher.RequestDispatcherManager {
+- IRequestDispatcher emptyRequestDispatcher
+- IRequestDispatcher staticHtmlRequestDispatcher
+- IRequestDispatcher servletRequestDispatcher
++ void dispatch(RequestDispatcherContext)
+- IRequestDispatcher getRequestDispatcher(String)
+}
+
+class jerrymouse.dispatcher.StaticHtmlRequestDispatcher {
++ void dispatch(RequestDispatcherContext)
+}
+
+class jerrymouse.dispatcher.RequestDispatcherContext << (D,orchid) @Data >> {
+- IRequest request
+- IResponse response
+- IServletManager servletManager
+- IFilterManager filterManager
+}
+
+class jerrymouse.dispatcher.EmptyRequestDispatcher {
++ void dispatch(RequestDispatcherContext)
+}
+
+class jerrymouse.classloader.LocalClassloader {
++ Class loadClass(String)
+}
+
+class jerrymouse.classloader.WebAppClassLoader {
+- Path classPath
+- List<Path> jarPaths
++ Class<?> loadClass(String)
+# Class<?> findClass(String)
+- byte[] toByteArray(InputStream)
+}
+
+interface jerrymouse.classloader.IClassLoader {
+~ Class loadClass(String)
+}
+
+abstract class java.lang.ClassLoader {
++ Class<?> loadClass(String name)
+# Class<?> findClass(String className)
+# Class<?> defineClass(String name, byte[] b, int off, int len)
+- Class<?> defineClass0(String name, byte[] b, int off, int len,
+                                         ProtectionDomain pd);
+- Class<?> defineClass1(String name, byte[] b, int off, int len,
+                                         ProtectionDomain pd, String source);
+}
+
+jerrymouse.impl.dto.IRequest <|.. jerrymouse.impl.dto.adaptor.JerryMouseRequestAdaptor
+jerrymouse.apps.servlet.AbstractJerryMouseServlet <|-- jerrymouse.apps.servlet.JerryMouseHttpTestServlet
+javax.servlet.http.HttpServletRequest <|-- jerrymouse.impl.dto.IRequest
+jerrymouse.apps.servlet.AbstractJerryMouseServlet <|-- jerrymouse.apps.servlet.JerryMouseHttpTest2Servlet
+jerrymouse.impl.dto.IResponse <|.. jerrymouse.impl.dto.adaptor.JerryMouseResponseAdaptor
+jerrymouse.support.war.IWarExtractor <|.. jerrymouse.support.war.WarExtractor
+javax.servlet.http.HttpServlet <|-- jerrymouse.apps.servlet.AbstractJerryMouseServlet
+javax.servlet.http.HttpServletResponse <|.. jerrymouse.impl.dto.JerryMouseResponseHelper
+jerrymouse.impl.dto.JerryMouseResponseHelper +.. jerrymouse.impl.dto.JerryMouseResponseHelper$OutputStreamHelper
+jerrymouse.impl.dto.ServletOutputStream <|-- jerrymouse.impl.dto.JerryMouseResponseHelper$OutputStreamHelper
+jerrymouse.impl.dto.JerryMouseResponseHelper +.. jerrymouse.impl.dto.JerryMouseResponseHelper$ByteArrayServletOutputStream
+jerrymouse.impl.dto.ServletOutputStream <|-- jerrymouse.impl.dto.JerryMouseResponseHelper$ByteArrayServletOutputStream
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.ServletRequestDispatcher
+javax.servlet.http.HttpFilter <|-- jerrymouse.apps.filter.SecondFilter
+javax.servlet.FilterChain <|.. jerrymouse.impl.JerryMouseFilterChain
+javax.servlet.http.HttpFilter <|-- jerrymouse.apps.filter.HelloFilter
+io.netty.channel.ChannelInboundHandlerAdapter <|-- jerrymouse.bootstrap.JerryMouseServerHandler
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.RequestDispatcherManager
+jerrymouse.support.xml.IWebXmlManager <|.. jerrymouse.support.xml.WebXmlManager
+jerrymouse.classloader.IClassLoader <|.. jerrymouse.classloader.LocalClassloader
+jerrymouse.support.servlet.IServletManager <|.. jerrymouse.support.servlet.DefaultServletManager
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.StaticHtmlRequestDispatcher
+jerrymouse.support.filter.IFilterManager <|.. jerrymouse.support.filter.DefaultFilterManager
+javax.servlet.http.HttpServletResponse <|-- jerrymouse.impl.dto.IResponse
+jerrymouse.impl.dto.adaptor.JerryMouseRequestAdaptor <|-- jerrymouse.impl.dto.JerryMouseRequest
+jerrymouse.classloader.IClassLoader <|.. jerrymouse.classloader.WebAppClassLoader
+java.lang.ClassLoader <|-- jerrymouse.classloader.WebAppClassLoader
+java.lang.ClassLoader <|-- jerrymouse.classloader.LocalClassloader
+javax.servlet.http.HttpServlet <|-- jerrymouse.apps.servlet.JerryMouseFilterTestServlet
+jerrymouse.impl.dto.adaptor.JerryMouseResponseAdaptor <|-- jerrymouse.impl.dto.JerryMouseResponse
+jerrymouse.dispatcher.IRequestDispatcher <|.. jerrymouse.dispatcher.EmptyRequestDispatcher
+jerrymouse.exception.RuntimeException <|-- jerrymouse.exception.JerryMouseException
+javax.servlet.http.HttpServlet <|-- jerrymouse.apps.servlet.JerryMouseHttpServlet
+@enduml

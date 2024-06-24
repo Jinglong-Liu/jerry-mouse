@@ -1,6 +1,5 @@
 package com.github.ljl.jerrymouse.dispatcher;
 
-import com.github.ljl.jerrymouse.dto.JerryMouseRequest;
 import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

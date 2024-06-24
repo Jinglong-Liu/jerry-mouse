@@ -285,6 +285,7 @@ public interface IServletManager {
 }
 ```
 目前使用web.xml的方式管理，格式形如
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <web-app version="2.4"
@@ -294,7 +295,7 @@ public interface IServletManager {
 
     <servlet>
         <servlet-name>test</servlet-name>
-        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpTestServlet</servlet-class>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseHttpTestServlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
@@ -304,7 +305,7 @@ public interface IServletManager {
 
     <servlet>
         <servlet-name>test2</servlet-name>
-        <servlet-class>com.github.ljl.jerrymouse.servlet.JerryMouseHttpTest2Servlet</servlet-class>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseHttpTest2Servlet</servlet-class>
     </servlet>
 
     <servlet-mapping>
@@ -1627,9 +1628,12 @@ web demo http index get using writer
 servlet index get
 ```
 
-git log
+[uml_v0.6.2](./uml/jerrymouse-v0.6.2.puml)
+
+git commit
 ```bash
 [jerry-mouse] 0.6.1 add filter filterChain
+[jerry-mouse] 0.6.2 add filter filterChain-fix1
 [web-demo] 0.6.1 add filter filterChain
-tag -a v0.6.1 -m "add filter filterChain"
+tag -a v0.6.2 -m "add filter filterChain"
 ```
