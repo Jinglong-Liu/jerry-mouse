@@ -76,7 +76,7 @@ public class WebXmlManager implements IWebXmlManager {
     }
 
     private void addAppContext(String urlPrefix) {
-        contextManager.registerServletContext(urlPrefix, new JerryMouseAppContext());
+        contextManager.registerServletContext(urlPrefix, new JerryMouseAppContext(urlPrefix));
     }
     private void loadServletFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
         try {

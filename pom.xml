@@ -6,7 +6,7 @@
 
     <groupId>org.example</groupId>
     <artifactId>jerry-mouse</artifactId>
-    <version>0.7.0</version>
+    <version>0.7.2</version>
 
     <dependencies>
         <dependency>
