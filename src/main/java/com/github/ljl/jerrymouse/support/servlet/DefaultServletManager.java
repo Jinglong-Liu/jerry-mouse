@@ -30,7 +30,6 @@ public class DefaultServletManager implements IServletManager {
 
     @Override
     public void register(String url, HttpServlet servlet) {
-        logger.info("[JerryMouse] register servlet, url={}, servlet={}", url, servlet.getClass().getName());
         servletMap.put(url, servlet);
     }
 

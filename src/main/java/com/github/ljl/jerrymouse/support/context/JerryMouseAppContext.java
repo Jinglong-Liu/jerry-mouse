@@ -29,6 +29,9 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
     private Map<String, Object> attributes = new ConcurrentHashMap<>();
 
     @Getter
+    private final String urlPrefix;
+
+    @Getter
     private IListenerManager listenerManager = new DefaultListenerManager();
 
     @Getter
@@ -37,8 +40,8 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
     @Getter
     private IServletManager servletManager = new DefaultServletManager();
 
-    public JerryMouseAppContext() {
-
+    public JerryMouseAppContext(String urlPrefix) {
+        this.urlPrefix = urlPrefix;
     }
 
     @Override
@@ -54,16 +57,19 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
 
     @Override
     public void registerServlet(String urlPattern, Servlet servlet) {
+        logger.info("[JerryMouse] register servlet, key = {}, url={}, servlet={}", urlPrefix, urlPattern, servlet.getClass().getName());
         servletManager.register(urlPattern, (HttpServlet) servlet);
     }
 
     @Override
     public void registerFilter(String urlPattern, Filter filter) {
+        logger.info("[JerryMouse] register filter, key = {}, url={}, servlet={}", urlPrefix, urlPattern, filter.getClass().getName());
         filterManager.register(urlPattern, filter);
     }
 
     @Override
     public void registerListener(EventListener listener) {
+        logger.info("[JerryMouse] register listener, key = {}, listener={}", urlPrefix, listener.getClass().getName());
         listenerManager.register("", listener);
     }
 

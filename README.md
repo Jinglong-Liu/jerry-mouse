@@ -1915,6 +1915,95 @@ servlet index get
 
 至此，实现了context的隔离，可以多测试一些用例，确保基本的Servlet, Filter, Listener 功能正确
 
+补充测试：web-demo已经包含两个子模块webapp1和webapp2，并且我们让两者的servlet, filter, listener 写在一个包下，加打印观察是否会混淆
+
+直接web-demo父工程mvn clean install即可
+
+```bash
+> [web-demo] mvn clean install
+> webapp1.war和webapp2.war放到[jerry-mouse]的对应目录
+> [jerry-mouse] mvn clean install
+> [jerry-mouse] 启动 Main
+观察控制台:
+2024-06-25 16:08:29 INFO  WebXmlManager:218 - JerryMouse handleWarPackage file=D:\java-learning\jerry-mouse\src\test\webapps\webapp1
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:60 - [JerryMouse] register servlet, key = /webapp1, url=/webapp1/index, servlet=com.github.ljl.web.servlet.servlet.IndexServlet
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:60 - [JerryMouse] register servlet, key = /webapp1, url=/webapp1/test/http, servlet=com.github.ljl.web.servlet.servlet.HttpServletDemo
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:60 - [JerryMouse] register servlet, key = /webapp1, url=/webapp1/test/listener/attr, servlet=com.github.ljl.web.servlet.servlet.ListenerAttrServlet
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:66 - [JerryMouse] register filter, key = /webapp1, url=/webapp1/index, servlet=com.github.ljl.web.servlet.filter.FirstFilter
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:66 - [JerryMouse] register filter, key = /webapp1, url=/webapp1/.*, servlet=com.github.ljl.web.servlet.filter.SecondFilter
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:72 - [JerryMouse] register listener, key = /webapp1, listener=com.github.ljl.web.servlet.listener.FirstAttrListener
+2024-06-25 16:08:29 INFO  WebXmlManager:218 - JerryMouse handleWarPackage file=D:\java-learning\jerry-mouse\src\test\webapps\webapp2
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:60 - [JerryMouse] register servlet, key = /webapp2, url=/webapp2/index, servlet=com.github.ljl.web.servlet.servlet.IndexServlet
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:60 - [JerryMouse] register servlet, key = /webapp2, url=/webapp2/test/http, servlet=com.github.ljl.web.servlet.servlet.HttpServletDemo
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:60 - [JerryMouse] register servlet, key = /webapp2, url=/webapp2/test/listener/attr, servlet=com.github.ljl.web.servlet.servlet.ListenerAttrServlet
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:66 - [JerryMouse] register filter, key = /webapp2, url=/webapp2/index, servlet=com.github.ljl.web.servlet.filter.FirstFilter
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:66 - [JerryMouse] register filter, key = /webapp2, url=/webapp2/.*, servlet=com.github.ljl.web.servlet.filter.SecondFilter
+2024-06-25 16:08:29 INFO  JerryMouseAppContext:72 - [JerryMouse] register listener, key = /webapp2, listener=com.github.ljl.web.servlet.listener.FirstAttrListener
+可见webapp1和webapp2被分别注册
+
+# testcase1
+> GET http://127.0.0.1:8080/webapp1/index
+控制台:
+[webapp1] Before web-demo FirstFilter
+[webapp1] Before web-demo SecondFilter
+2024-06-25 14:07:59 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+[webapp1] After web-demo SecondFilter
+[webapp1] After web-demo FirstFilter
+返回:
+[webapp1] servlet index get
+
+# testcase2
+> http://127.0.0.1:8080/webapp2/index
+控制台:
+[webapp2] Before web-demo SecondFilter
+[webapp2] Before web-demo FirstFilter
+2024-06-25 14:08:59 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+[webapp2] After web-demo FirstFilter
+[webapp2] After web-demo SecondFilter
+返回:
+[webapp2] servlet index get
+
+# testcase3
+> GET http://127.0.0.1:8080/webapp1/test/listener/attr
+控制台:
+[webapp1] Before web-demo SecondFilter
+[webapp1] before attr set
+[webapp1] attribute added. name={man},value={What can I say}
+[webapp1] after set man
+[webapp1] attribute removed. name={man},value={Tomcat out!}
+[webapp1] after replace man
+[webapp1] get key={man}, value={Tomcat out!}
+[webapp1] attribute removed. name={man},value={Tomcat out!}
+[webapp1] after remove man
+[webapp1] get key={man}, value={null}
+2024-06-25 15:56:38 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+[webapp1] After web-demo SecondFilter
+返回:
+Tomcat out!
+
+# testcase4
+> GET http://127.0.0.1:8080/webapp1/test/listener/attr
+控制台:
+[webapp2] Before web-demo SecondFilter
+[webapp2] before attr set
+[webapp2] attribute added. name={man},value={What can I say}
+[webapp2] after set man
+[webapp2] attribute removed. name={man},value={Tomcat out!}
+[webapp2] after replace man
+[webapp2] get key={man}, value={Tomcat out!}
+[webapp2] attribute removed. name={man},value={Tomcat out!}
+[webapp2] after remove man
+[webapp2] get key={man}, value={null}
+2024-06-25 15:57:27 INFO  JerryMouseResponse:41 - [JerryMouse] channelRead writeAndFlush DONE
+[webapp2] After web-demo SecondFilter
+返回:
+Tomcat out!
+
+可见webapp1和webapp2是相互隔离的, 即使两个servlet的全名相同
+
+想一想, 我想让不同人开发的webapp 在一个tomcat(jerry-mouse)上运行, 两个人的类名完全可能重复, 因此分别独立进行类加载, 放到各自的context即可, 不会造成冲突
+```
+
 __阶段总结:__
 
 - 一个webapp对应一个appContext
@@ -1923,10 +2012,17 @@ __阶段总结:__
 - 启动时，加载web.xml, 通过项目名urlPrefix注册新的appContext，将servlet, filter, listener 等组件注册到对应的appContext中
 - 请求时，根据url获得对应的context, 再根据url获得对应的servlet等组件
 - 实现效果: listener, filter仅对当前app(web.xml)的servlet生效
+- 进行了相关测试
 
 git commit
 ```bash
-jerry-mouse: [jerry-mouse] v0.7.1 separate AppContext
+jerry-mouse: 
+[jerry-mouse] v0.7.1 separate AppContext
+[jerry-mouse] v0.7.2 separate AppContext add more tests
 git tag -a v0.7.1 -m "v0.7.1 separate AppContext"
-web-demo:       [web-demo] v0.7.1 separate AppContext
+git tag -a v0.7.2 -m "v0.7.2 separate AppContext add more tests"
+
+web-demo:
+[web-demo] v0.7.2 separate AppContext add more tests
+git tag -a v0.7.2 -m "v0.7.2 separate AppContext add more tests"
 ```
