@@ -19,4 +19,6 @@ public interface IAppContext {
     void registerFilter(String urlPattern, Filter filter);
 
     void registerListener(EventListener listener);
+
+    void initializeServletContextListeners();
 }

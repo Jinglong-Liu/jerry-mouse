@@ -1,6 +1,5 @@
 package com.github.ljl.jerrymouse.support.servlet;
 
-import com.github.ljl.jerrymouse.support.threadpool.JerryMouseThreadPoolUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -5,16 +5,8 @@ import com.github.ljl.jerrymouse.exception.JerryMouseException;
 import com.github.ljl.jerrymouse.classloader.IClassLoader;
 import com.github.ljl.jerrymouse.classloader.LocalClassloader;
 import com.github.ljl.jerrymouse.classloader.WebAppClassLoader;
-import com.github.ljl.jerrymouse.support.context.IAppContext;
-import com.github.ljl.jerrymouse.support.context.IContextManager;
-import com.github.ljl.jerrymouse.support.context.JerryMouseAppContext;
-import com.github.ljl.jerrymouse.support.context.JerryMouseContextManager;
-import com.github.ljl.jerrymouse.support.filter.DefaultFilterManager;
-import com.github.ljl.jerrymouse.support.filter.IFilterManager;
-import com.github.ljl.jerrymouse.support.listener.DefaultListenerManager;
-import com.github.ljl.jerrymouse.support.listener.IListenerManager;
-import com.github.ljl.jerrymouse.support.servlet.DefaultServletManager;
-import com.github.ljl.jerrymouse.support.servlet.IServletManager;
+import com.github.ljl.jerrymouse.support.context.*;
+import com.github.ljl.jerrymouse.support.servlet.JerryMouseServletConfig;
 import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -24,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.Filter;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
 import java.io.File;
 import java.io.InputStream;
@@ -68,30 +62,44 @@ public class WebXmlManager implements IWebXmlManager {
     }
 
     private void loadFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
-        addAppContext(urlPrefix);
+        ServletContext context = addAppContext(urlPrefix);
         loadServletFromWebXml(urlPrefix, document, classLoader);
         loadFilterFromWebXml(urlPrefix, document, classLoader);
         loadListenerFromWebXml(urlPrefix, document, classLoader);
+        loadContextParamFromWebXml(urlPrefix, document, classLoader);
         // TODO: load other tags
+        ((JerryMouseAppContext) context).initializeServletContextListeners();
     }
 
-    private void addAppContext(String urlPrefix) {
-        contextManager.registerServletContext(urlPrefix, new JerryMouseAppContext(urlPrefix));
+    private ServletContext addAppContext(String urlPrefix) {
+        ServletContext context = new JerryMouseAppContext(urlPrefix);
+        contextManager.registerServletContext(urlPrefix, context);
+        return context;
     }
+
     private void loadServletFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
         try {
             JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
 
             Element rootElement = document.getRootElement();
             List<Element> selectNodes = rootElement.elements("servlet");
-            Map<String, String> map = new HashMap<>();
+            Map<String, ServletConfig> map = new HashMap<>();
+
             /**
-             * 1, 找到所有的servlet标签，找到servlet-name和servlet-class
+             * 1, 找到所有的servlet标签，找到servlet-name和servlet-class, 创建对应的ServletConfig
              */
             for (Element element : selectNodes) {
                 String name = element.elementText("servlet-name");
                 String className = element.elementText("servlet-class");
-                map.put(name, className);
+                ServletConfig servletConfig = new JerryMouseServletConfig(appContext, name, className);
+                map.put(name, servletConfig);
+
+                List<Element> initParamElements = element.elements("init-param");
+                initParamElements.stream().forEach(param -> {
+                    String paramName = param.elementText("param-name");
+                    String paramValue = param.elementText("param-value");
+                    ((JerryMouseServletConfig) servletConfig).setInitParameter(paramName, paramValue);
+                });
             }
             /**
              * 2, 根据servlet-name找到<servlet-mapping>中与其匹配的<url-pattern>
@@ -102,12 +110,13 @@ public class WebXmlManager implements IWebXmlManager {
                 String urlPattern = mappingElement.elementText("url-pattern");
                 // 检查 <servlet-name> 是否存在于 <servlet> 元素中
                 if (map.containsKey(name)) {
-                    String className = map.get(name);
+                    ServletConfig config = map.get(name);
                     // 加载class
-                    Class clazz = classLoader.loadClass(className);
+                    Class clazz = classLoader.loadClass(((JerryMouseServletConfig) config).getClazzName());
                     HttpServlet httpServlet = (HttpServlet) clazz.newInstance();
+                    httpServlet.init(config);
                     /**
-                     * 3. 注册对应的 url + servlet
+                     * 3. 注册对应的 url + servlet 到 context
                      */
                     appContext.registerServlet(urlPrefix + urlPattern, httpServlet);
                     // servletManager.register(urlPrefix + urlPattern, httpServlet);
@@ -184,6 +193,24 @@ public class WebXmlManager implements IWebXmlManager {
         }
     }
 
+    private void loadContextParamFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
+        try {
+            JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
+            Element rootElement = document.getRootElement();
+            /**
+             * 根据<context-param>标签设置全局的初始化表
+             */
+            List<Element> contextParamElements = rootElement.elements("context-param");
+            contextParamElements.forEach(element ->  {
+                String paramName = element.elementText("param-name");
+                String paramValue = element.elementText("param-value");
+                appContext.setInitParameter(paramName, paramValue);
+            });
+        } catch (Exception e) {
+            logger.error("[JerryMouse] load-ContextParam from web.xml failed", e);
+            e.printStackTrace();
+        }
+    }
     @Override
     public void parseWebappXml(String baseDirStr) {
         logger.info("[JerryMouse] servlet init with baseDir={}", baseDirStr);
