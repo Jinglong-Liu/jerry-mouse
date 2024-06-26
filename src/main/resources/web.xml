@@ -5,6 +5,16 @@
          xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd">
 
     <servlet>
+        <servlet-name>jsonServlet</servlet-name>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JsonServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>jsonServlet</servlet-name>
+        <url-pattern>/test/json</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
         <servlet-name>test</servlet-name>
         <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseHttpTestServlet</servlet-class>
     </servlet>

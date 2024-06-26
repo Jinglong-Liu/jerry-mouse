@@ -2197,3 +2197,145 @@ git commit
 [jerry-mouse] v0.7.3 Adapter ServletConfig
 [web-demo] v0.7.3 Adapter ServletConfig
 ```
+
+## 7.4 how "setContentType(application/json)" work ?
+
+问题：
+观察TestServletApiServlet，发现使用了json，但是最后返回仍然需要手动用http报文封装
+现在，我们想要返回`application/json` 类型，不想手动封装http报文，该如何操作呢
+
+显然是使用这个接口
+``` java
+interface ServletResponse {
+    void setContentType(String var1);
+    String getContentType();
+}
+```
+
+servlet开发者，用tomcat容器，则直接使用setContentType接口即可。问题在于，HttpServletResponse是接口，没有实现
+实现在Tomcat中，因此也是本次jerry-mouse需要完成的工作
+
+因此到目前为止，response.setContentType操作其实是没有用的（自己写的空操作）
+
+观察http响应报文的格式，发现Context-Type属性在header里面，字段名称以及含义见
+
+[http header字段名称及含义](https://datatracker.ietf.org/doc/html/rfc7231#section-8.3.2)
+
+而HttpServletResponse恰有接口
+```java
+public interface HttpServletResponse extends ServletResponse {
+    void setHeader(String var1, String var2);
+}
+```
+因此转而我们去实现setHeader接口。但是，问题仍然没有解决。设置完成之后就可以不封装报文了吗？
+
+不可以。浏览器仍然需要解析HTTP报文，既然servlet编写者不想自己封装，那就把这个工作转交给容器
+
+因此jerry-mouse要帮忙完成报文的封装。
+
+效果就是让servlet编写者，设置完成header或者ContentType后，直接返回对象，而不需要重写封装成http报文
+
+例如返回json，json最终就是转化成一个字符串嘛，这里做的说到底，无非就是字符串拼接的工作，非常简单。
+
+问题在于在哪里拼接成报文。（writer/outputStream真正输出时）
+
+测试用例Servlet：要求能正确用的api更多了
+```java
+public class JsonServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 要求返回报文中，Content-Type字段值为 application/json; charset=UTF-8
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+        // 先不去管怎么生成json串的(有工具可以快速生成)
+        String jsonPart1 = "{ \"message\": \"GET, JSON!\", ";
+        String jsonPart2 = "\"code\":\"0\" }";
+        // 该值与浏览器/postman解析出的Context-Length应当一致
+        System.out.println("doGet: predicted content length = " + (jsonPart1 + jsonPart2).length());
+        // body返回json串, 要求允许分段write，并被浏览器解析
+        PrintWriter writer = resp.getWriter();
+        writer.write(jsonPart1);
+        writer.write(jsonPart2);
+        // 自动生成正确的context-length
+
+        // 要求writer.flush代替resp.flushBuffer()
+        writer.flush();
+        //resp.flushBuffer();
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 要求setHeader 可以设置字段值
+        resp.setHeader("Content-Type", "application/json; charset=UTF-8");
+        String jsonStr = "{ \"message\": \"POST, JSON!\", \"code\":\"0\" }";
+        // 要求自动生成contentLength
+        // resp.setContentLength(jsonStr.length());
+        // json串, 要求可以用print/println
+        ServletOutputStream outputStream = resp.getOutputStream();
+        outputStream.println(jsonStr);
+
+        // 要求writer.flush代替resp.flushBuffer()
+        outputStream.flush();
+        // resp.flushBuffer();
+    }
+}
+
+```
+需要注意，CharacterEncoding是charset，属于Content-Type字段的一部分内容，和 Content-Encoding是两回事
+
+阅读之前实现的resp.flushBuffer()，拆分到writer和outputStream中，并分析什么时候真正写入
+
+以及writer.write(), outputStream.print()到底在干什么？
+
+实际上重写writer.flush()以及outputStream.flush()即可
+
+代码参考实现见后面的git commit
+
+__阶段总结__
+
+目前为止，要求实现或使之有效的api
+
+```java
+public interface HttpServletResponse extends ServletResponse {
+    // HttpServletResponse
+    boolean containsHeader(String var1);
+    void setHeader(String var1, String var2);
+    // 暂不要求多个同名header-name
+    // void addHeader(String var1, String var2);
+    void setStatus(int var1);
+    int getStatus();
+    String getHeader(String var1);
+    Collection<String> getHeaders(String var1);
+    Collection<String> getHeaderNames();
+
+    // ServletResponse
+    String getCharacterEncoding();
+    String getContentType();
+    ServletOutputStream getOutputStream() throws IOException;
+    PrintWriter getWriter() throws IOException;
+    void setCharacterEncoding(String var1);
+    void setContentLength(int var1);
+    void setContentLengthLong(long var1);
+    void setContentType(String var1);
+    void flushBuffer() throws IOException;
+}
+// response.getOutputStream()
+public abstract class ServletOutputStream extends OutputStream {
+    public void print(String s) throws IOException;     // 允许多次调用
+    public void println(String s) throws IOException;   // 允许多次调用
+    public void flush() throws IOException;
+}
+// response.getWriter()
+public class PrintWriter extends Writer {
+    public void write(String s);                        // 允许多次调用
+    public void flush();
+}
+```
+
+```bash
+commit:
+[jerry-mouse] v0.7.4 support json type and adaptor some response api
+
+tag:
+git tag -a v0.7.4 -m "support json type and adaptor some response api"
+```
