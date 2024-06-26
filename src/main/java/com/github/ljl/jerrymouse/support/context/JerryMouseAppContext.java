@@ -28,6 +28,8 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
 
     private Map<String, Object> attributes = new ConcurrentHashMap<>();
 
+    private Map<String, String> initContextParams = new HashMap<>();
+
     @Getter
     private final String urlPrefix;
 
@@ -74,9 +76,16 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
     }
 
     @Override
+    public void initializeServletContextListeners() {
+        getListenersBySubType(ServletContextListener.class).forEach(listener -> {
+            listener.contextInitialized(new ServletContextEvent(this));
+        });
+    }
+
+    @Override
     public void setAttribute(String s, Object o) {
 
-        List<ServletContextAttributeListener> listeners = getAttributeListeners();
+        List<ServletContextAttributeListener> listeners = getListenersBySubType(ServletContextAttributeListener.class);
         ServletContextAttributeEvent contextEvent = new ServletContextAttributeEvent(this, s, o);
 
         if (!attributes.containsKey(s)) {
@@ -98,17 +107,36 @@ public class JerryMouseAppContext extends JerryMouseContextAdaptor implements IA
             Object value = attributes.get(s);
             attributes.remove(s);
             // remove
-            List<ServletContextAttributeListener> listeners = getAttributeListeners();
+            List<ServletContextAttributeListener> listeners = getListenersBySubType(ServletContextAttributeListener.class);
             ServletContextAttributeEvent contextEvent = new ServletContextAttributeEvent(this, s, value);
             listeners.forEach(listener -> listener.attributeRemoved(contextEvent));
         }
     }
 
-    private List<ServletContextAttributeListener> getAttributeListeners() {
+    private <T extends EventListener> List<T> getListenersBySubType(Class<T> eventType) {
         return listenerManager.getListeners()
                 .stream()
-                .filter(listener -> listener instanceof ServletContextAttributeListener)
-                .map(listener -> (ServletContextAttributeListener) listener)
+                .filter(listener -> eventType.isInstance(listener))
+                .map(listener -> eventType.cast(listener))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean setInitParameter(String name, String value) {
+        if(initContextParams.containsKey(name)) {
+            return false;
+        }
+        initContextParams.put(name, value);
+        return true;
+    }
+
+    @Override
+    public String getInitParameter(String s) {
+        return initContextParams.get(s);
+    }
+
+    @Override
+    public Enumeration<String> getInitParameterNames() {
+        return  Collections.enumeration(initContextParams.keySet());
     }
 }
