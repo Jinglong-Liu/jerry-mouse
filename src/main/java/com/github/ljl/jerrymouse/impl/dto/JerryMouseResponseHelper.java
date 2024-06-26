@@ -1,13 +1,17 @@
 package com.github.ljl.jerrymouse.impl.dto;
 
+import com.github.ljl.jerrymouse.exception.JerryMouseException;
+import com.github.ljl.jerrymouse.utils.JerryMouseHttpUtils;
+import com.sun.corba.se.impl.interceptors.SlotTable;
+import org.omg.CORBA.Object;
+
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.charset.Charset;
-import java.util.Collection;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * @program: jerry-mouse
@@ -19,11 +23,25 @@ import java.util.Locale;
 
 public class JerryMouseResponseHelper implements HttpServletResponse {
 
+    /**
+     * https://datatracker.ietf.org/doc/html/rfc7231#section-8.3.2
+     */
+    private static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
+    private static final String CHARACTER_ENCODING_NAME = "charset";
+    private static final String CONTENT_LENGTH_HEADER_NAME = "Context-Length";
+    private static final String CONTENT_ENCODING_HEADER_NAME = "Content-Encoding";
+
+    private static final String CONTENT_TYPE_TEXT_HTML = "text/html";
+
     private JerryMouseResponse response;
     private StringWriter stringWriter;
     private PrintWriter writer;
-    /**
-     * 采用ByteArrayServletOutputStream
+
+    // 暂时不允许同名字段
+    private Map<String, String> headers = new HashMap<>();
+
+    private int status = 200;
+    /**s
      * 若采用OutputStreamHelper(response)，则复用JerryMouseRequest.write()
      * 两者均可正常运行
      */
@@ -32,9 +50,13 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
     public JerryMouseResponseHelper(JerryMouseResponse response) {
         this.response = response;
         this.stringWriter = new StringWriter();
-        this.writer = new PrintWriter(stringWriter);
+        // 重写PrintWriter
+        this.writer = new HttpPrintWriter(stringWriter);
         this.outputStream = new ByteArrayServletOutputStream();
         // this.outputStream = new OutputStreamHelper(response);
+        // 暂时不支持自动推导类型
+        this.setContentType(CONTENT_TYPE_TEXT_HTML);
+        this.setStatus(200);
     }
     @Override
     public void addCookie(Cookie cookie) {
@@ -43,7 +65,7 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
 
     @Override
     public boolean containsHeader(String s) {
-        return false;
+        return headers.containsKey(s);
     }
 
     @Override
@@ -93,12 +115,15 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
 
     @Override
     public void setHeader(String s, String s1) {
-
+        if (s.equals(CONTENT_TYPE_HEADER_NAME)) {
+            setContentType(s1);
+        }
+        headers.put(s, s1);
     }
 
     @Override
     public void addHeader(String s, String s1) {
-
+        headers.put(s, s1);
     }
 
     @Override
@@ -113,42 +138,52 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
 
     @Override
     public void setStatus(int i) {
-
+        this.status = i;
     }
 
+    @Deprecated
     @Override
     public void setStatus(int i, String s) {
-
+        throw new JerryMouseException("Deprecated setStatus(" + i + ", " + s + ")");
     }
 
     @Override
     public int getStatus() {
-        return 0;
+        return status;
     }
 
     @Override
     public String getHeader(String s) {
-        return null;
+        return headers.get(s);
     }
 
     @Override
     public Collection<String> getHeaders(String s) {
-        return null;
+        return headers.values();
     }
 
     @Override
     public Collection<String> getHeaderNames() {
-        return null;
+        return headers.keySet();
     }
 
     @Override
     public String getCharacterEncoding() {
-        return null;
+        String charset = null;
+        final String contentType = headers.get(CONTENT_TYPE_HEADER_NAME);
+        if (Objects.isNull(contentType)) {
+            return null;
+        }
+        if (contentType.contains("charset=")) {
+            int charsetIndex = contentType.indexOf("charset=");
+            charset = contentType.substring(charsetIndex);
+        }
+        return charset;
     }
 
     @Override
     public String getContentType() {
-        return null;
+        return headers.get(CONTENT_TYPE_HEADER_NAME);
     }
 
     @Override
@@ -168,22 +203,64 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
 
     @Override
     public void setCharacterEncoding(String s) {
+        String oldContentType = headers.get(CONTENT_TYPE_HEADER_NAME);
+        String contextType = "";
+        // 判断 oldContentType 中是否已经包含 charset 属性
+        if (oldContentType.contains("charset=")) {
+            // 使用正则表达式替换 charset
+            contextType = oldContentType.replaceAll("charset=[^;]*", "charset=" + s);
+        } else {
+            // 如果 oldContentType 不包含 charset 属性，则直接添加
+            contextType = oldContentType + "; charset=" + s;
+        }
 
+        headers.put(CONTENT_TYPE_HEADER_NAME, contextType);
     }
 
     @Override
     public void setContentLength(int i) {
-
+        headers.put(CONTENT_LENGTH_HEADER_NAME, String.valueOf(i));
     }
 
     @Override
     public void setContentLengthLong(long l) {
-
+        headers.put(CONTENT_LENGTH_HEADER_NAME, String.valueOf(l));
     }
 
     @Override
-    public void setContentType(String s) {
+    public void setContentType(String type) {
 
+        String charset = null;
+
+        String oldContentType = headers.get(CONTENT_TYPE_HEADER_NAME);
+        if (Objects.isNull(oldContentType)) {
+            headers.put(CONTENT_TYPE_HEADER_NAME, type);
+            return;
+        }
+        // 提取旧的 charset
+        if (oldContentType.contains("charset=")) {
+            int charsetIndex = oldContentType.indexOf("charset=");
+            charset = oldContentType.substring(charsetIndex);
+        }
+
+        // 新的 contentType 是否包含 charset
+        if (type.contains("charset=")) {
+            headers.put(CONTENT_TYPE_HEADER_NAME, type);
+        } else {
+            if (charset != null) {
+                // text/html;
+                String newContentType = null;
+                if (type.contains(";")) {
+                    newContentType = type + " " + charset;
+                } else {
+                    // text/html
+                    newContentType = type + "; " + charset;
+                }
+                headers.put(CONTENT_TYPE_HEADER_NAME, newContentType);
+            } else {
+                headers.put(CONTENT_TYPE_HEADER_NAME, type);
+            }
+        }
     }
 
     @Override
@@ -200,20 +277,6 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
     public void flushBuffer() throws IOException {
         writer.flush();
         outputStream.flush();
-
-        String writerContent = stringWriter.toString();
-        if (!writerContent.isEmpty()) {
-            response.write(writerContent, "UTF-8");
-        }
-
-        byte[] outputStreamContent = new byte[0];
-        if (outputStream instanceof ByteArrayServletOutputStream) {
-            outputStreamContent = ((ByteArrayServletOutputStream)outputStream).toByteArray();
-        }
-
-        if (outputStreamContent.length > 0) {
-            response.write(new String(outputStreamContent, Charset.forName("UTF-8")), "UTF-8");
-        }
     }
 
     @Override
@@ -241,37 +304,7 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
         return null;
     }
 
-    /**
-     * 复用JerryMouseResponse
-     */
-    private static class OutputStreamHelper extends ServletOutputStream {
-
-        private final JerryMouseResponse response;
-
-        public OutputStreamHelper(JerryMouseResponse response) {
-            this.response = response;
-        }
-        @Override
-        public boolean isReady() {
-            return false;
-        }
-
-        @Override
-        public void setWriteListener(WriteListener writeListener) {
-
-        }
-
-        @Override
-        public void write(int b) throws IOException {
-
-        }
-
-        @Override
-        public void print(String s) throws IOException {
-            response.write(s);
-        }
-    }
-    private static class ByteArrayServletOutputStream extends ServletOutputStream {
+    private class ByteArrayServletOutputStream extends ServletOutputStream {
         private ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
         @Override
@@ -294,6 +327,50 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
         @Override
         public void flush() throws IOException {
             byteArrayOutputStream.flush();
+
+            byte[] outputStreamContent = new byte[0];
+            if (outputStream instanceof ByteArrayServletOutputStream) {
+                outputStreamContent = ((ByteArrayServletOutputStream)outputStream).toByteArray();
+            }
+
+            if (outputStreamContent.length > 0) {
+                String out = buildResponse(new String(outputStreamContent, Charset.forName("UTF-8")));
+                // 真正写入
+                response.write(out, "UTF-8");
+            }
+        }
+    }
+
+    public class HttpPrintWriter extends PrintWriter {
+        public HttpPrintWriter(Writer out) {
+            super(out);
+        }
+
+        @Override
+        public void flush() {
+            String writerContent = stringWriter.toString();
+            if (!writerContent.isEmpty()) {
+                // 构建http报文
+                String out = buildResponse(writerContent);
+                // 真正写入
+                response.write(out, "UTF-8");
+            }
+        }
+    }
+
+    private String buildResponse(String body) {
+        if (JerryMouseHttpUtils.isCompleteResponse(body)) {
+            return body;
+        } else {
+            StringBuilder builder = JerryMouseHttpUtils.createResponse(Integer.valueOf(getStatus()));
+            JerryMouseHttpUtils.addHeaders(builder, headers);
+            // 自动生成contentLength
+            if (!containsHeader(CONTENT_LENGTH_HEADER_NAME)) {
+                JerryMouseHttpUtils.addHeader(builder,CONTENT_LENGTH_HEADER_NAME, String.valueOf(body.length()));
+            }
+            builder.append("\r\n");
+            builder.append(body);
+            return builder.toString();
         }
     }
 }

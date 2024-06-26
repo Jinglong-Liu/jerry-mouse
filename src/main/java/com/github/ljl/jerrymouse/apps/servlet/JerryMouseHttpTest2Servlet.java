@@ -21,7 +21,6 @@ public class JerryMouseHttpTest2Servlet extends AbstractJerryMouseServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
         String content = "JerryMouseHttpTestServlet2-get";
-
         JerryMouseResponse response = (JerryMouseResponse) resp;
         response.write(JerryMouseHttpUtils.http200Resp(content));
     }
