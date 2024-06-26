@@ -2026,3 +2026,174 @@ web-demo:
 [web-demo] v0.7.2 separate AppContext add more tests
 git tag -a v0.7.2 -m "v0.7.2 separate AppContext add more tests"
 ```
+
+7.3 从 servlet 获取 appContext 补充实现
+
+需求
+javax.servlet.http.HttpServlet(的子类GenericServlet)有下面这些获得context的方法
+```java
+public abstract class GenericServlet implements Servlet, ServletConfig, Serializable {
+    public ServletConfig getServletConfig() {
+        return this.config;
+    }
+
+    public ServletContext getServletContext() {
+        ServletConfig sc = this.getServletConfig();
+        if (sc == null) {
+            throw new IllegalStateException(lStrings.getString("err.servlet_config_not_initialized"));
+        } else {
+            return sc.getServletContext();
+        }
+    }
+}
+```
+
+JerryMouse之前的servlet只能通过request.getServletContext来获取appContext, 现在要求让Servlet的getServletContext()方法生效
+一个简单的想法是通过AbstractJerryMouseServlet作为servlet的基类，覆写getServletContext，但我们注意，客户（其他webapp编写者）可是根据
+javax.servlet.http.HttpServlet 协议直接编写servlet, 不会管你自己添加的类，要求做到“无感知实现”，让tomcat替换成jerry-mouse时依旧生效
+
+不能覆写HttpServlet的getServletContext()方法，却要根据基类的逻辑，使这个功能生效
+
+非常简单。留作习题，读者可以自行完成，巩固编程基础。
+
+```java
+// 习题：请实现下面api
+
+// 对任意编写的Servlet extends HttpServlet, 以下接口正确生效
+public abstract class HttpServlet {
+    String getServletName();
+    ServletContext getServletContext();
+    String getInitParameter(String name);
+    Enumeration<String> getInitParameterNames();
+}
+// 对servlet获取到的context，以下接口正确生效
+public interface ServletContext {
+    String getInitParameter(String var1);
+    Enumeration<String> getInitParameterNames();
+    boolean setInitParameter(String var1, String var2);
+}
+// 另外，记得本章的主题Listener吗，目前适配了ServletContextAttributeListener接口的功能，用户可以使用
+// 那么，请适配ServletContextListener接口的contextInitialized方法，在context初始化后执行
+// 还记得从哪里入手吗？ context在哪里初始化的？
+// context 里面筛选listener的接口优化？需要每种listener写一个函数？尝试使用 <T extends EventListener> List<T>类型， 并理解与List<EventListener> 的区别
+// 理解一下 "生命周期" 的含义
+public interface ServletContextListener extends EventListener {
+    // 本次实现
+    default void contextInitialized(ServletContextEvent sce) {
+    }
+
+    // 后续实现
+    default void contextDestroyed(ServletContextEvent sce) {
+    }
+}
+```
+参考：
+一个web.xml的demo如下
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
+         version="4.0">
+
+    <!-- 定义全局的初始化参数 -->
+    <context-param>
+        <param-name>globalParam1</param-name>
+        <param-value>value1</param-value>
+    </context-param>
+    <context-param>
+        <param-name>globalParam2</param-name>
+        <param-value>value2</param-value>
+    </context-param>
+
+    <!-- Servlet 配置 -->
+    <servlet>
+        <servlet-name>HelloServlet</servlet-name>
+        <servlet-class>com.github.ljl.jerrymouse.apps.servlet.JerryMouseHttpServlet</servlet-class>
+        <!-- Servlet 自己的初始化参数 -->
+        <init-param>
+            <param-name>param1</param-name>
+            <param-value>value1</param-value>
+        </init-param>
+        <init-param>
+            <param-name>param2</param-name>
+            <param-value>value2</param-value>
+        </init-param>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>HelloServlet</servlet-name>
+        <url-pattern>/hello</url-pattern>
+    </servlet-mapping>
+
+</web-app>
+```
+
+测试:servlet见web-demo/webapp3
+
+测试
+```bash
+[web-demo]
+> mvn clean install
+> webapp3.war move to target dir
+
+[jerry-mouse]
+> mvn clean install
+> 启动Main
+> GET http://127.0.0.1:8080/webapp3/test/servletApi
+期望返回:
+{
+    "result": {
+        "result": "All Testcases Pass",
+        "message": ""
+    },
+    "passedTests": {
+        "result": "8",
+        "message": ""
+    },
+    "testcase1": {
+        "result": "pass",
+        "message": ""
+    },
+    "testcase2": {
+        "result": "pass",
+        "message": ""
+    },
+    "failedTests": {
+        "result": "0",
+        "message": ""
+    },
+    "testcase3": {
+        "result": "pass",
+        "message": ""
+    },
+    "testcase4": {
+        "result": "pass",
+        "message": ""
+    },
+    "testcase5": {
+        "result": "pass",
+        "message": ""
+    },
+    "testcase6": {
+        "result": "pass",
+        "message": ""
+    },
+    "testcase7": {
+        "result": "pass",
+        "message": ""
+    },
+    "testcase8": {
+        "result": "pass",
+        "message": ""
+    }
+}
+```
+
+参考实现
+
+git commit
+```bash
+[jerry-mouse] v0.7.3 Adapter ServletConfig
+[web-demo] v0.7.3 Adapter ServletConfig
+```
