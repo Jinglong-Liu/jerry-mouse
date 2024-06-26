@@ -71,4 +71,49 @@ public class JerryMouseResponse extends JerryMouseResponseAdaptor {
     public void flushBuffer() throws IOException {
         helper.flushBuffer();
     }
+
+    /**
+     * @param s header name
+     * @return header value
+     * @since 0.7.4
+     */
+    @Override
+    public String getHeader(String s) {
+        return helper.getHeader(s);
+    }
+
+    @Override
+    public void setHeader(String s, String s1) {
+        helper.setHeader(s, s1);
+    }
+
+    @Override
+    public void setContentType(String s) {
+        helper.setContentType(s);
+    }
+
+    @Override
+    public String getContentType() {
+        return helper.getContentType();
+    }
+
+    @Override
+    public void setCharacterEncoding(String s) {
+        helper.setCharacterEncoding(s);
+    }
+
+    @Override
+    public String getCharacterEncoding() {
+        return helper.getCharacterEncoding();
+    }
+
+    @Override
+    public void setStatus(int i) {
+        helper.setStatus(i);
+    }
+
+    @Override
+    public int getStatus() {
+        return helper.getStatus();
+    }
 }
