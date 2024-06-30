@@ -1,0 +1,41 @@
+@startuml
+start
+:开始;
+:实现一个最简单的springmvc app demo;
+:使用嵌入式Tomcat启动测试功能(可暂不支持jsp);
+:去掉启动类和Tomcat支持;
+:打war包, 放到jerry-mouse对应目录;
+repeat
+:启动jerry-mouse, 用postman等工具测试;
+
+if (按预期返回) then (是)
+  :结束;
+  stop
+else (否)
+  if (定位错误) is (api未正确实现) then
+    :启动带Tomcat的webmvc项目;
+    :调用api，明确其含义;
+    :编程实现相关api
+    (主要是Request, ServletContent);
+  else ()
+    if () is (web.xml解析错误) then
+      :搜索web.xml相关字段含义;
+      :调试springmvc源码;
+      :编程补充实现;
+    else (类或资源加载失败)
+
+        :分析加载失败原因;
+        :调试springmvc源码;
+        :明确类加载器接口含义;
+        :编程补充实现;
+
+
+    endif
+  endif
+endif
+
+ repeat while (继续测试)
+@enduml
+
+
+相信对httpServlet各个接口的含义，以及springmvc的流程，都有了初步的了解

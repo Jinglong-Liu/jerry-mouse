@@ -1,0 +1,14 @@
+@startuml
+start
+:准备工作;
+repeat
+  :执行任务;
+  if (条件判断) then (是)
+    :条件满足时执行的动作;
+  else (否)
+    :条件不满足时执行的动作;
+  endif
+repeat while (条件为真)
+:执行结束;
+stop
+@enduml

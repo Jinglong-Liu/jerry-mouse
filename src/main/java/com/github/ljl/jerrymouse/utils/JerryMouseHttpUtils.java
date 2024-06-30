@@ -76,4 +76,48 @@ public class JerryMouseHttpUtils {
         }
         return responseLines[0].matches(pattern);
     }
+
+    public static String replaceCharacterEncoding(String oldContentType, String charset) {
+        if (StringUtil.isEmptyTrim(charset)) {
+            return oldContentType;
+        }
+        String contextType = null;
+        int charsetIndex = oldContentType.indexOf("charset=");
+        if (charsetIndex != -1) {
+            // 替换已有的charset参数
+            int endIndex = oldContentType.indexOf(';', charsetIndex);
+            if (endIndex == -1) {
+                endIndex = oldContentType.length();
+            }
+            StringBuilder sb = new StringBuilder(oldContentType);
+            sb.replace(charsetIndex + "charset=".length(), endIndex, oldContentType);
+            contextType = sb.toString();
+        } else {
+            // 没有找到charset参数，添加新的charset参数
+            StringBuilder sb = new StringBuilder(oldContentType);
+            sb.append("; charset=").append(charset);
+            contextType = sb.toString();
+        }
+        return contextType;
+    }
+    public static String extractCharacterEncoding(String contentType) {
+        if (StringUtil.isEmptyTrim(contentType)) {
+            return null;
+        }
+        // 查找charset参数
+        int charsetIndex = contentType.indexOf("charset=");
+        if (charsetIndex == -1) {
+            return null; // 如果没有找到charset参数，返回空
+        }
+
+        // 提取charset的值
+        int startIndex = charsetIndex + "charset=".length();
+        int endIndex = contentType.indexOf(';', startIndex);
+        if (endIndex == -1) {
+            endIndex = contentType.length();
+        }
+
+        String charset = contentType.substring(startIndex, endIndex).trim();
+        return charset;
+    }
 }

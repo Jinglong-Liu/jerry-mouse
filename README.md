@@ -2339,3 +2339,547 @@ commit:
 tag:
 git tag -a v0.7.4 -m "support json type and adaptor some response api"
 ```
+
+## 8、支持 spring-mvc
+
+笔者调试使用的spring版本均为5.3.3，请不要使用 >= 6 的Spring 框架
+因为后者支持的是jakarta.servlet.Servlet，前者也就是本次JerryMouse支持的是javax.servlet.Servlet
+
+见 [maven仓库提示](https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api)
+
+spring终于登场，如果你之前根本不了解spring, springmvc，那么：
+
+请使用chatgpt等工具，帮助生成一个最基本的springmvc项目，并打包成war, 在官网下载的Tomcat上运行测试
+
+所以就把它看作一个普通的web项目。
+
+直观经验上，它和普通的web项目的区别在于：可以使用诸多springmvc支持的注解开发。
+
+最后仍然要基于Tomcat等容器运行。
+
+还有一个区别在于，在web.xml中需要配置一个DispatcherServlet，并且加载webmvc的配置xxx.xml
+
+看源码可知道，其他所有注册的Servlet，都是先分发给DispatchServlet, 由这个Servlet进行匹配。
+
+这个机制在Springmvc 源码中实现，不需要容器额外实现。
+
+但是，其中会用到很多Request和Content的接口，这些前面我们还没有实现，需要实现。
+
+### springmvc的 web.xml
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee
+         http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
+         id="WebApp_ID" version="4.0">
+    <servlet>
+        <servlet-name>dispatcher</servlet-name>
+        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+        <init-param>
+            <param-name>contextConfigLocation</param-name>
+            <param-value>/WEB-INF/applicationContext.xml</param-value>
+        </init-param>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>dispatcher</servlet-name>
+        <url-pattern>/</url-pattern>
+    </servlet-mapping>
+    <listener>
+        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    </listener>
+    <context-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>/WEB-INF/applicationContext.xml</param-value>
+    </context-param>
+</web-app>
+```
+
+### 举例
+举例说明我们必须需要实现的接口
+```java
+public class UrlPathHelper {
+    public String getPathWithinApplication(HttpServletRequest request) {
+        // 再点进去，发现request的getContextPath需要实现
+        String contextPath = this.getContextPath(request);
+        String requestUri = this.getRequestUri(request);
+        String path = this.getRemainingPath(requestUri, contextPath, true);
+        if (path != null) {
+            return StringUtils.hasText(path) ? path : "/";
+        } else {
+            return requestUri;
+        }
+    }
+
+    public String getContextPath(HttpServletRequest request) {
+        // 之前有setAttribute，现在get出来，不管你怎么实现，总之set进去要能get出来
+        String contextPath = (String) request.getAttribute("javax.servlet.include.context_path");
+        if (contextPath == null) {
+            contextPath = request.getContextPath();
+        }
+
+        if (StringUtils.matchesCharacter(contextPath, '/')) {
+            contextPath = "";
+        }
+
+        return this.decodeRequestString(request, contextPath);
+    }
+
+    protected String determineEncoding(HttpServletRequest request) {
+        String enc = request.getCharacterEncoding();
+        if (enc == null) {
+            // 也就是说这次你的getCharacterEncoding接口非得返回null，可能也不是不行。
+            enc = this.getDefaultEncoding();
+        }
+
+        return enc;
+    }
+}
+```
+
+再点进去发现，getContextPath() -> getURI() -> getServletPath()，因此getServletPath也要实现
+
+实际上，实现Servlet接口，就是遵循一种规约，理论上需要全部实现。但是，我们不想逐个去查询，背诵接口含义，只想根据需求实现。（未经过测试的代码不允许入库）
+
+我们自己编不出什么需求，可以把springmvc作为客户端，观察客户端有那些需求，而哪一些是必须实现的。这样等真正遇到时再实现，会有更加深刻的印象。
+
+实际上，springmvc正是起到了一个中间桥梁的作用。一方面，作为客户端，根据servlet协议，调用某些接口，实现自己的功能；另一方面，作为服务端，面向java程序员，让后者能够通过简单的注解，配置，进行开发。
+
+而我们现在作为Servlet容器（JerryMouse) 开发者，就是要实现servlet协议，让springmvc作为客户端来调用！
+
+一种比较快的方法，是先查询文档，实现部分简单功能，然后将未实现功能全部抛异常，等框架调用到时，再定位并实现。
+
+### 工作流程（仅供参考）：
+[uml](./uml/support_mvc_workflow.puml)
+
+![springmvc-workflow](./images/v0.8/support_mvc_workflow.png)
+
+提示：入口是DispatchServlet(extends HttpServletBean)的init(),里面的initServletBean()
+
+
+### 需求（预期）：
+
+1、能支持单一springmvc 打成的war包的demo web程序
+
+2、在JerryMouse的pom不导入任何Spring包，不导入Tomcat的前提下(不能直接加到classpath)，
+能同时支持多个springmvc 打成的war包的demo web程序，支持不同的(5.x.x)spring-mvc版本
+
+3、同时支持普通的servlet打成的war包，以及本地的Servlet(前面已经实现的功能不能缺失)
+
+springmvc demo项目可以见web-demo项目的提交
+
+### 提示：
+
+1、本章节的一个要点在于类加载器的完善(思考为什么之前的类加载器如此简单，也能运行)。注意classLoader的传递方式。
+
+2、需要达成需求2，意味着自定义类加载器能加载不同的目录下的spring。
+
+3、要想不同app同全名的类不冲突，请学习类加载器双亲委派(父级委托)机制(Parent Delegation Mechanism)。目前不需要像Tomcat这么复杂，根据当前版本的需求，可以有很简单的实现方式。
+
+4、可以和笔者一样，借此机会梳理几遍springmvc工作流程。弄清楚哪些功能是springmvc处理的，哪些功能是Tomcat(JerryMouse)处理的，它们之间是如何交互的。
+
+5、细节较多，对于没有接触过Spring和Tomcat，不熟悉类加载的萌新，建议花费一周时间完成本章内容。笔者大量的时间精力用在调试springmvc，尝试通过框架来确定servlet-api具体应该如何实现。需求细节真正明确后，代码实现很简单。
+
+### 经验
+下面是笔者调试过程中的一些记录以及经验
+
+关注 getResource()
+```bash
+"pool-1-thread-1@860" prio=5 tid=0xd nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at java.lang.ClassLoader.getResources(ClassLoader.java:1129)
+	  at org.springframework.core.io.support.PathMatchingResourcePatternResolver.doFindAllClassPathResources(PathMatchingResourcePatternResolver.java:338)
+	  at org.springframework.core.io.support.PathMatchingResourcePatternResolver.findAllClassPathResources(PathMatchingResourcePatternResolver.java:321)
+	  at org.springframework.core.io.support.PathMatchingResourcePatternResolver.getResources(PathMatchingResourcePatternResolver.java:288)
+	  at org.springframework.core.io.support.PathMatchingResourcePatternResolver.findPathMatchingResources(PathMatchingResourcePatternResolver.java:497)
+	  at org.springframework.core.io.support.PathMatchingResourcePatternResolver.getResources(PathMatchingResourcePatternResolver.java:284)
+	  at org.springframework.context.support.AbstractApplicationContext.getResources(AbstractApplicationContext.java:1416)
+	  at org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider.scanCandidateComponents(ClassPathScanningCandidateComponentProvider.java:420)
+	  at org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider.findCandidateComponents(ClassPathScanningCandidateComponentProvider.java:315)
+	  at org.springframework.context.annotation.ClassPathBeanDefinitionScanner.doScan(ClassPathBeanDefinitionScanner.java:276)
+	  at org.springframework.context.annotation.ComponentScanBeanDefinitionParser.parse(ComponentScanBeanDefinitionParser.java:90)
+	  at org.springframework.beans.factory.xml.NamespaceHandlerSupport.parse(NamespaceHandlerSupport.java:74)
+	  at org.springframework.beans.factory.xml.BeanDefinitionParserDelegate.parseCustomElement(BeanDefinitionParserDelegate.java:1391)
+	  at org.springframework.beans.factory.xml.BeanDefinitionParserDelegate.parseCustomElement(BeanDefinitionParserDelegate.java:1371)
+	  at org.springframework.beans.factory.xml.DefaultBeanDefinitionDocumentReader.parseBeanDefinitions(DefaultBeanDefinitionDocumentReader.java:179)
+	  at org.springframework.beans.factory.xml.DefaultBeanDefinitionDocumentReader.doRegisterBeanDefinitions(DefaultBeanDefinitionDocumentReader.java:149)
+	  at org.springframework.beans.factory.xml.DefaultBeanDefinitionDocumentReader.registerBeanDefinitions(DefaultBeanDefinitionDocumentReader.java:96)
+	  at org.springframework.beans.factory.xml.XmlBeanDefinitionReader.registerBeanDefinitions(XmlBeanDefinitionReader.java:511)
+	  at org.springframework.beans.factory.xml.XmlBeanDefinitionReader.doLoadBeanDefinitions(XmlBeanDefinitionReader.java:391)
+	  at org.springframework.beans.factory.xml.XmlBeanDefinitionReader.loadBeanDefinitions(XmlBeanDefinitionReader.java:338)
+	  at org.springframework.beans.factory.xml.XmlBeanDefinitionReader.loadBeanDefinitions(XmlBeanDefinitionReader.java:310)
+	  at org.springframework.beans.factory.support.AbstractBeanDefinitionReader.loadBeanDefinitions(AbstractBeanDefinitionReader.java:188)
+	  at org.springframework.beans.factory.support.AbstractBeanDefinitionReader.loadBeanDefinitions(AbstractBeanDefinitionReader.java:224)
+	  at org.springframework.beans.factory.support.AbstractBeanDefinitionReader.loadBeanDefinitions(AbstractBeanDefinitionReader.java:195)
+	  at org.springframework.web.context.support.XmlWebApplicationContext.loadBeanDefinitions(XmlWebApplicationContext.java:125)
+	  at org.springframework.web.context.support.XmlWebApplicationContext.loadBeanDefinitions(XmlWebApplicationContext.java:94)
+	  at org.springframework.context.support.AbstractRefreshableApplicationContext.refreshBeanFactory(AbstractRefreshableApplicationContext.java:130)
+	  at org.springframework.context.support.AbstractApplicationContext.obtainFreshBeanFactory(AbstractApplicationContext.java:676)
+	  at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:558)
+	  - locked <0x814> (a java.lang.Object)
+	  at org.springframework.web.servlet.FrameworkServlet.configureAndRefreshWebApplicationContext(FrameworkServlet.java:702)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:668)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:716)
+	  at org.springframework.web.servlet.FrameworkServlet.initWebApplicationContext(FrameworkServlet.java:591)
+	  at org.springframework.web.servlet.FrameworkServlet.initServletBean(FrameworkServlet.java:530)
+	  at org.springframework.web.servlet.HttpServletBean.init(HttpServletBean.java:170)
+	  at javax.servlet.GenericServlet.init(GenericServlet.java:203)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadServletFromWebXml(WebXmlManager.java:129)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadFromWebXml(WebXmlManager.java:70)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadAndRegisterWebapps(WebXmlManager.java:285)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.handleWarPackage(WebXmlManager.java:270)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.parseWebappXml(WebXmlManager.java:238)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.before(JerryMouseBootstrap.java:131)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.startService(JerryMouseBootstrap.java:88)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.lambda$start$0(JerryMouseBootstrap.java:83)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap$$Lambda$4.504527234.run(Unknown Source:-1)
+	  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+
+需要正确实现getInputStream()
+```bash
+"pool-1-thread-1@857" prio=5 tid=0xd nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at org.springframework.core.io.ClassPathResource.getInputStream(ClassPathResource.java:179)
+	  at org.springframework.core.type.classreading.SimpleMetadataReader.getClassReader(SimpleMetadataReader.java:55)
+	  at org.springframework.core.type.classreading.SimpleMetadataReader.<init>(SimpleMetadataReader.java:49)
+	  at org.springframework.core.type.classreading.SimpleMetadataReaderFactory.getMetadataReader(SimpleMetadataReaderFactory.java:103)
+	  at org.springframework.core.type.classreading.CachingMetadataReaderFactory.getMetadataReader(CachingMetadataReaderFactory.java:123)
+	  at org.springframework.core.type.classreading.SimpleMetadataReaderFactory.getMetadataReader(SimpleMetadataReaderFactory.java:81)
+	  at org.springframework.context.annotation.ConfigurationClassParser.asSourceClass(ConfigurationClassParser.java:696)
+	  at org.springframework.context.annotation.ConfigurationClassParser.asSourceClass(ConfigurationClassParser.java:645)
+	  at org.springframework.context.annotation.ConfigurationClassParser.processConfigurationClass(ConfigurationClassParser.java:248)
+	  at org.springframework.context.annotation.ConfigurationClassParser.parse(ConfigurationClassParser.java:207)
+	  at org.springframework.context.annotation.ConfigurationClassParser.parse(ConfigurationClassParser.java:175)
+	  at org.springframework.context.annotation.ConfigurationClassPostProcessor.processConfigBeanDefinitions(ConfigurationClassPostProcessor.java:336)
+	  at org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry(ConfigurationClassPostProcessor.java:252)
+	  at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanDefinitionRegistryPostProcessors(PostProcessorRegistrationDelegate.java:285)
+	  at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(PostProcessorRegistrationDelegate.java:99)
+	  at org.springframework.context.support.AbstractApplicationContext.invokeBeanFactoryPostProcessors(AbstractApplicationContext.java:751)
+	  at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:569)
+	  - locked <0x7ca> (a java.lang.Object)
+	  at org.springframework.web.servlet.FrameworkServlet.configureAndRefreshWebApplicationContext(FrameworkServlet.java:702)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:668)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:716)
+	  at org.springframework.web.servlet.FrameworkServlet.initWebApplicationContext(FrameworkServlet.java:591)
+	  at org.springframework.web.servlet.FrameworkServlet.initServletBean(FrameworkServlet.java:530)
+	  at org.springframework.web.servlet.HttpServletBean.init(HttpServletBean.java:170)
+	  at javax.servlet.GenericServlet.init(GenericServlet.java:203)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadServletFromWebXml(WebXmlManager.java:130)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadFromWebXml(WebXmlManager.java:71)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadAndRegisterWebapps(WebXmlManager.java:289)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.handleWarPackage(WebXmlManager.java:271)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.parseWebappXml(WebXmlManager.java:239)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.before(JerryMouseBootstrap.java:131)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.startService(JerryMouseBootstrap.java:88)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.lambda$start$0(JerryMouseBootstrap.java:83)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap$$Lambda$4.504527234.run(Unknown Source:-1)
+	  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+
+读到了HelloController.class
+```bash
+"pool-1-thread-1@879" prio=5 tid=0xd nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at org.springframework.core.type.classreading.SimpleMetadataReader.getClassReader(SimpleMetadataReader.java:57)
+	  at org.springframework.core.type.classreading.SimpleMetadataReader.<init>(SimpleMetadataReader.java:49)
+	  at org.springframework.core.type.classreading.SimpleMetadataReaderFactory.getMetadataReader(SimpleMetadataReaderFactory.java:103)
+	  at org.springframework.core.type.classreading.CachingMetadataReaderFactory.getMetadataReader(CachingMetadataReaderFactory.java:123)
+	  at org.springframework.core.type.classreading.SimpleMetadataReaderFactory.getMetadataReader(SimpleMetadataReaderFactory.java:81)
+	  at org.springframework.context.annotation.ConfigurationClassParser.asSourceClass(ConfigurationClassParser.java:696)
+	  at org.springframework.context.annotation.ConfigurationClassParser.asSourceClass(ConfigurationClassParser.java:645)
+	  at org.springframework.context.annotation.ConfigurationClassParser.processConfigurationClass(ConfigurationClassParser.java:248)
+	  at org.springframework.context.annotation.ConfigurationClassParser.parse(ConfigurationClassParser.java:207)
+	  at org.springframework.context.annotation.ConfigurationClassParser.parse(ConfigurationClassParser.java:175)
+	  at org.springframework.context.annotation.ConfigurationClassPostProcessor.processConfigBeanDefinitions(ConfigurationClassPostProcessor.java:336)
+	  at org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry(ConfigurationClassPostProcessor.java:252)
+	  at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanDefinitionRegistryPostProcessors(PostProcessorRegistrationDelegate.java:285)
+	  at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(PostProcessorRegistrationDelegate.java:99)
+	  at org.springframework.context.support.AbstractApplicationContext.invokeBeanFactoryPostProcessors(AbstractApplicationContext.java:751)
+	  at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:569)
+	  - locked <0x7a1> (a java.lang.Object)
+	  at org.springframework.web.servlet.FrameworkServlet.configureAndRefreshWebApplicationContext(FrameworkServlet.java:702)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:668)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:716)
+	  at org.springframework.web.servlet.FrameworkServlet.initWebApplicationContext(FrameworkServlet.java:591)
+	  at org.springframework.web.servlet.FrameworkServlet.initServletBean(FrameworkServlet.java:530)
+	  at org.springframework.web.servlet.HttpServletBean.init(HttpServletBean.java:170)
+	  at javax.servlet.GenericServlet.init(GenericServlet.java:203)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadServletFromWebXml(WebXmlManager.java:130)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadFromWebXml(WebXmlManager.java:71)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadAndRegisterWebapps(WebXmlManager.java:289)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.handleWarPackage(WebXmlManager.java:271)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.parseWebappXml(WebXmlManager.java:239)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.before(JerryMouseBootstrap.java:131)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.startService(JerryMouseBootstrap.java:88)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.lambda$start$0(JerryMouseBootstrap.java:83)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap$$Lambda$4.836514715.run(Unknown Source:-1)
+	  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+
+
+解析Configuration注解的Class
+org.springframework.context.annotation.ConfigurationClassParser
+
+扫描注解
+```bash
+"pool-1-thread-1@879" prio=5 tid=0xd nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at org.springframework.context.annotation.ConfigurationClassParser.doProcessConfigurationClass(ConfigurationClassParser.java:291)
+	  at org.springframework.context.annotation.ConfigurationClassParser.processConfigurationClass(ConfigurationClassParser.java:250)
+	  at org.springframework.context.annotation.ConfigurationClassParser.parse(ConfigurationClassParser.java:207)
+	  at org.springframework.context.annotation.ConfigurationClassParser.parse(ConfigurationClassParser.java:175)
+	  at org.springframework.context.annotation.ConfigurationClassPostProcessor.processConfigBeanDefinitions(ConfigurationClassPostProcessor.java:336)
+	  at org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry(ConfigurationClassPostProcessor.java:252)
+	  at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanDefinitionRegistryPostProcessors(PostProcessorRegistrationDelegate.java:285)
+	  at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(PostProcessorRegistrationDelegate.java:99)
+	  at org.springframework.context.support.AbstractApplicationContext.invokeBeanFactoryPostProcessors(AbstractApplicationContext.java:751)
+	  at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:569)
+	  - locked <0x7a1> (a java.lang.Object)
+	  at org.springframework.web.servlet.FrameworkServlet.configureAndRefreshWebApplicationContext(FrameworkServlet.java:702)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:668)
+	  at org.springframework.web.servlet.FrameworkServlet.createWebApplicationContext(FrameworkServlet.java:716)
+	  at org.springframework.web.servlet.FrameworkServlet.initWebApplicationContext(FrameworkServlet.java:591)
+	  at org.springframework.web.servlet.FrameworkServlet.initServletBean(FrameworkServlet.java:530)
+	  at org.springframework.web.servlet.HttpServletBean.init(HttpServletBean.java:170)
+	  at javax.servlet.GenericServlet.init(GenericServlet.java:203)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadServletFromWebXml(WebXmlManager.java:130)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadFromWebXml(WebXmlManager.java:71)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.loadAndRegisterWebapps(WebXmlManager.java:289)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.handleWarPackage(WebXmlManager.java:271)
+	  at com.github.ljl.jerrymouse.support.xml.WebXmlManager.parseWebappXml(WebXmlManager.java:239)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.before(JerryMouseBootstrap.java:131)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.startService(JerryMouseBootstrap.java:88)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap.lambda$start$0(JerryMouseBootstrap.java:83)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseBootstrap$$Lambda$4.836514715.run(Unknown Source:-1)
+	  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+
+匹配方法
+```bash
+"nioEventLoopGroup-3-1@4380" prio=10 tid=0x12 nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at org.springframework.web.servlet.mvc.condition.PatternsRequestCondition.getMatchingPattern(PatternsRequestCondition.java:313)
+	  at org.springframework.web.servlet.mvc.condition.PatternsRequestCondition.getMatchingPatterns(PatternsRequestCondition.java:296)
+	  at org.springframework.web.servlet.mvc.condition.PatternsRequestCondition.getMatchingCondition(PatternsRequestCondition.java:281)
+	  at org.springframework.web.servlet.mvc.method.RequestMappingInfo.getMatchingCondition(RequestMappingInfo.java:399)
+	  at org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping.getMatchingMapping(RequestMappingInfoHandlerMapping.java:108)
+	  at org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping.getMatchingMapping(RequestMappingInfoHandlerMapping.java:66)
+	  at org.springframework.web.servlet.handler.AbstractHandlerMethodMapping.addMatchingMappings(AbstractHandlerMethodMapping.java:423)
+	  at org.springframework.web.servlet.handler.AbstractHandlerMethodMapping.lookupHandlerMethod(AbstractHandlerMethodMapping.java:386)
+	  at org.springframework.web.servlet.handler.AbstractHandlerMethodMapping.getHandlerInternal(AbstractHandlerMethodMapping.java:364)
+	  at org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping.getHandlerInternal(RequestMappingInfoHandlerMapping.java:123)
+	  at org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping.getHandlerInternal(RequestMappingInfoHandlerMapping.java:66)
+	  at org.springframework.web.servlet.handler.AbstractHandlerMapping.getHandler(AbstractHandlerMapping.java:491)
+	  at org.springframework.web.servlet.DispatcherServlet.getHandler(DispatcherServlet.java:1254)
+	  at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1036)
+	  at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:962)
+	  at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1006)
+	  at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:909)
+	  at javax.servlet.http.HttpServlet.service(HttpServlet.java:665)
+	  at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:883)
+	  at javax.servlet.http.HttpServlet.service(HttpServlet.java:750)
+	  at com.github.ljl.jerrymouse.impl.JerryMouseFilterChain.doFilter(JerryMouseFilterChain.java:36)
+	  at com.github.ljl.jerrymouse.dispatcher.ServletRequestDispatcher.filter(ServletRequestDispatcher.java:60)
+	  at com.github.ljl.jerrymouse.dispatcher.ServletRequestDispatcher.dispatch(ServletRequestDispatcher.java:51)
+	  at com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager.dispatch(RequestDispatcherManager.java:31)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseServerHandler.channelRead(JerryMouseServerHandler.java:62)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	  at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1410)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:919)
+	  at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	  at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	  at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	  at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	  at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+
+执行方法
+```bash
+"nioEventLoopGroup-3-1@4380" prio=10 tid=0x12 nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+	  at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:197)
+	  at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:141)
+	  at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:106)
+	  at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:894)
+	  at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:808)
+	  at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	  at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1060)
+	  at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:962)
+	  at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1006)
+	  at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:909)
+	  at javax.servlet.http.HttpServlet.service(HttpServlet.java:665)
+	  at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:883)
+	  at javax.servlet.http.HttpServlet.service(HttpServlet.java:750)
+	  at com.github.ljl.jerrymouse.impl.JerryMouseFilterChain.doFilter(JerryMouseFilterChain.java:36)
+	  at com.github.ljl.jerrymouse.dispatcher.ServletRequestDispatcher.filter(ServletRequestDispatcher.java:60)
+	  at com.github.ljl.jerrymouse.dispatcher.ServletRequestDispatcher.dispatch(ServletRequestDispatcher.java:51)
+	  at com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager.dispatch(RequestDispatcherManager.java:31)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseServerHandler.channelRead(JerryMouseServerHandler.java:62)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	  at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1410)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:919)
+	  at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	  at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	  at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	  at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	  at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+
+写回, 流程正确结束
+```bash
+      writeInternal(t, outputMessage);
+      outputMessage.getBody().flush();
+      at com.github.ljl.jerrymouse.impl.dto.JerryMouseResponseHelper$ByteArrayServletOutputStream.flush(JerryMouseResponseHelper.java:320)
+	  at sun.nio.cs.StreamEncoder.implFlush(StreamEncoder.java:297)
+	  at sun.nio.cs.StreamEncoder.flush(StreamEncoder.java:141)
+	  - locked <0x17bd> (a java.io.OutputStreamWriter)
+	  at java.io.OutputStreamWriter.flush(OutputStreamWriter.java:229)
+	  at org.springframework.util.StreamUtils.copy(StreamUtils.java:148)
+	  at org.springframework.http.converter.StringHttpMessageConverter.writeInternal(StringHttpMessageConverter.java:126)
+	  at org.springframework.http.converter.StringHttpMessageConverter.writeInternal(StringHttpMessageConverter.java:44)
+	  at org.springframework.http.converter.AbstractHttpMessageConverter.write(AbstractHttpMessageConverter.java:227)
+	  at org.springframework.web.servlet.mvc.method.annotation.AbstractMessageConverterMethodProcessor.writeWithMessageConverters(AbstractMessageConverterMethodProcessor.java:280)
+	  at org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor.handleReturnValue(RequestResponseBodyMethodProcessor.java:181)
+	  at org.springframework.web.method.support.HandlerMethodReturnValueHandlerComposite.handleReturnValue(HandlerMethodReturnValueHandlerComposite.java:78)
+	  at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:124)
+	  at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:894)
+	  at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:808)
+	  at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	  at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1060)
+	  at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:962)
+	  at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1006)
+	  at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:909)
+	  at javax.servlet.http.HttpServlet.service(HttpServlet.java:665)
+	  at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:883)
+	  at javax.servlet.http.HttpServlet.service(HttpServlet.java:750)
+	  at com.github.ljl.jerrymouse.impl.JerryMouseFilterChain.doFilter(JerryMouseFilterChain.java:36)
+	  at com.github.ljl.jerrymouse.dispatcher.ServletRequestDispatcher.filter(ServletRequestDispatcher.java:60)
+	  at com.github.ljl.jerrymouse.dispatcher.ServletRequestDispatcher.dispatch(ServletRequestDispatcher.java:51)
+	  at com.github.ljl.jerrymouse.dispatcher.RequestDispatcherManager.dispatch(RequestDispatcherManager.java:31)
+	  at com.github.ljl.jerrymouse.bootstrap.JerryMouseServerHandler.channelRead(JerryMouseServerHandler.java:62)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	  at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1410)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	  at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	  at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:919)
+	  at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	  at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	  at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	  at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	  at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	  at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	  at java.lang.Thread.run(Thread.java:748)
+```
+
+打断点！！！如果你调不出来，一定是打的断点还不够多。学会借助工具(包括但不限于IDE，AI工具)。对于萌新而言，vim + sout(print)大法，是很难完成本章节的。
+
+可以先在JerryMouse引入对应版本的spring-mvc进行断点调试（思考为什么可以）,之后再删除JerryMouse的spring依赖
+
+![breakpoint](./images/v0.8/breakpoints.png)
+
+经典错误：
+```bash
+Class org.springframework.web.servlet.DispatcherServletBeanInfo not found
+Class java.lang.ObjectBeanInfo not found
+Class javax.servlet.GenericServletBeanInfo not found
+Class javax.servlet.http.HttpServletBeanInfo not found
+```
+BeanInfo是由introspection（内省）生成，用于缓存提高效率。可以暂不处理，不影响执行正确性。
+
+```bash
+org.springframework.beans.factory.parsing.BeanDefinitionParsingException: Configuration problem: Unable to locate Spring NamespaceHandler for XML schema namespace
+
+D:\java-learning\jerry-mouse\src\test\webapps\springmvc-app1\META-INF\spring.schemas NOT exist!!!
+D:\java-learning\jerry-mouse\src\test\webapps\springmvc-app1\META-INF\spring.handlers NOT exist!!!
+```
+名空间错误:jar包没解析正确，检查类加载器的getResource是否可以正确获得资源。自行搜索解析方式
+
+
+### 测试与总结
+笔者已经初步实现该功能，支持多个不同的springmvc webapp war包，同时不影响旧功能。
+
+已经进行简要测试。
+
+测试方法
+```bash
+web-demo:
+父工程(web-demo) mvn clean install
+将子模块(springmvc-app1, springmvc-app2, webapp1-4)生成的war包放到[jerry-mouse]的src/test(原目录)下
+
+jerry-mouse:
+修改Main.java中的baseDir为你的电脑的baseDir
+启动Main
+postman 发送请求, 要求正确打印以及返回
+```
+
+测试用例(后续补充)
+```bash
+# testcase1
+# 解析参数和body
+GET http://127.0.0.1:8080/springmvc-app1/json?key1=value1&key1=value2&key2=value3
+body = 
+{
+    "key1" : "key11",
+    "key2" : 120
+}
+观察控制台打印
+返回 
+{"servlet": "TestRequestApiServlet"}
+
+# testcase2
+# 参数用以干扰解析url，本次测试不读取解析。也可以自己添加无效的body测试
+# 实际这次GET, POST换一下也能请求
+> GET http://127.0.0.1:8080/springmvc-app1/json?key1=value1&key1=value2&key2=value3
+返回 {"result":"hello json"}
+
+> POST http://127.0.0.1:8080/springmvc-app1/hello/json
+返回 {"result":"hello json 1"}
+
+# testcase3
+# 测试两个springmvc项目均可正常执行，互不干扰
+> GET/POST http://127.0.0.1:8080/springmvc-app2/hello/json
+返回 {"result":"hello jsonMethod() springmvc-app2"}
+> GET/POST http://127.0.0.1:8080/springmvc-app2/json
+返回 {"result":"hello json() springmvc-app2"}
+```
+
+代码实现如下：
+```bash
+# git commit
+[jerry-mouse] v0.8.2-support-springmvc-demo
+[web-demo]    v0.8.2-support-springmvc-demo
+
+git tag -a v0.8.2 -m "support-springmvc-demo"
+```
+
+// 本章节文档未完善，简要记录，后续补充

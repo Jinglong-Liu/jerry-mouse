@@ -1,7 +1,9 @@
 package com.github.ljl.jerrymouse.impl.dto;
 
 import javax.servlet.ServletContext;
+import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Map;
 
 public interface IRequest extends HttpServletRequest {
     /**
@@ -10,16 +12,11 @@ public interface IRequest extends HttpServletRequest {
      */
     String getUrl();
 
-    /**
-     * 获取方法
-     * @return method
-     */
-    String getMethod();
+    void setHeaders(Map<String, String> headers);
 
-    /**
-     * 获取 ApplicationContext
-     * @return ApplicationContext
-     */
-    @Override
-    ServletContext getServletContext();
+    void setQueryParams(Map<String, String[]> queryParams);
+
+    void setInputStream(ServletInputStream inputStream);
+
+    void setServletContext(ServletContext servletContext);
 }

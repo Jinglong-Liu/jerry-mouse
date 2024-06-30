@@ -3,6 +3,7 @@ package com.github.ljl.jerrymouse.impl;
 import javax.servlet.*;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @program: jerry-mouse
@@ -31,7 +32,9 @@ public class JerryMouseFilterChain implements FilterChain {
             filter.doFilter(request, response, this);
         }
         else if (pos == filters.size()) {
-            servlet.service(request, response);
+            if (Objects.nonNull(servlet)) {
+                servlet.service(request, response);
+            }
         }
     }
 }

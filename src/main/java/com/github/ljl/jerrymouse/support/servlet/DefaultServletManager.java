@@ -4,8 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServlet;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @program: jerry-mouse
@@ -34,6 +36,27 @@ public class DefaultServletManager implements IServletManager {
 
     @Override
     public HttpServlet getServlet(String url) {
-        return servletMap.get(url);
+        String key = findTarget(servletMap.keySet(), url);
+        if (Objects.isNull(key)) {
+            return servletMap.get("/");
+        }
+        return servletMap.get(key);
+    }
+    private String findTarget(Collection<String> list, String target) {
+        String result = null;
+
+        for (String s : list) {
+            // Check for exact match
+            if (s.equals(target)) {
+                return s;
+            }
+
+            // Check for prefix match ending with "/"
+            if (s.endsWith("/") && target.startsWith(s) && (result == null || s.length() > result.length())) {
+                result = s;
+            }
+        }
+
+        return result;
     }
 }
