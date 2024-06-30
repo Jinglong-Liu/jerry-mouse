@@ -169,16 +169,8 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
 
     @Override
     public String getCharacterEncoding() {
-        String charset = null;
-        final String contentType = headers.get(CONTENT_TYPE_HEADER_NAME);
-        if (Objects.isNull(contentType)) {
-            return null;
-        }
-        if (contentType.contains("charset=")) {
-            int charsetIndex = contentType.indexOf("charset=");
-            charset = contentType.substring(charsetIndex);
-        }
-        return charset;
+        final String contentType = headers.getOrDefault(CONTENT_TYPE_HEADER_NAME, "");
+        return JerryMouseHttpUtils.extractCharacterEncoding(contentType);
     }
 
     @Override
@@ -204,16 +196,7 @@ public class JerryMouseResponseHelper implements HttpServletResponse {
     @Override
     public void setCharacterEncoding(String s) {
         String oldContentType = headers.get(CONTENT_TYPE_HEADER_NAME);
-        String contextType = "";
-        // 判断 oldContentType 中是否已经包含 charset 属性
-        if (oldContentType.contains("charset=")) {
-            // 使用正则表达式替换 charset
-            contextType = oldContentType.replaceAll("charset=[^;]*", "charset=" + s);
-        } else {
-            // 如果 oldContentType 不包含 charset 属性，则直接添加
-            contextType = oldContentType + "; charset=" + s;
-        }
-
+        String contextType = JerryMouseHttpUtils.replaceCharacterEncoding(oldContentType, s);
         headers.put(CONTENT_TYPE_HEADER_NAME, contextType);
     }
 

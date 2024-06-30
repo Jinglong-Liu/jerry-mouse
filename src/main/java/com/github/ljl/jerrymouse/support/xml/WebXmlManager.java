@@ -2,11 +2,11 @@ package com.github.ljl.jerrymouse.support.xml;
 
 import com.github.ljl.jerrymouse.annotation.Singleton;
 import com.github.ljl.jerrymouse.exception.JerryMouseException;
-import com.github.ljl.jerrymouse.classloader.IClassLoader;
 import com.github.ljl.jerrymouse.classloader.LocalClassloader;
 import com.github.ljl.jerrymouse.classloader.WebAppClassLoader;
 import com.github.ljl.jerrymouse.support.context.*;
 import com.github.ljl.jerrymouse.support.servlet.JerryMouseServletConfig;
+import com.github.ljl.jerrymouse.support.threadpool.JerryMouseThreadPoolUtil;
 import com.github.ljl.jerrymouse.utils.JerryMouseResourceUtils;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -21,8 +21,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
 import java.io.File;
 import java.io.InputStream;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URL;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.List;
@@ -61,23 +60,23 @@ public class WebXmlManager implements IWebXmlManager {
         return instance;
     }
 
-    private void loadFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
-        ServletContext context = addAppContext(urlPrefix);
-        loadServletFromWebXml(urlPrefix, document, classLoader);
-        loadFilterFromWebXml(urlPrefix, document, classLoader);
+    private void loadFromWebXml(String urlPrefix, Document document, ServletContext servletContext) {
+        ClassLoader classLoader = servletContext.getClassLoader();
         loadListenerFromWebXml(urlPrefix, document, classLoader);
+        loadFilterFromWebXml(urlPrefix, document, classLoader);
         loadContextParamFromWebXml(urlPrefix, document, classLoader);
+        loadServletFromWebXml(urlPrefix, document, classLoader);
         // TODO: load other tags
-        ((JerryMouseAppContext) context).initializeServletContextListeners();
+        ((JerryMouseAppContext) servletContext).initializeServletContextListeners();
     }
 
-    private ServletContext addAppContext(String urlPrefix) {
-        ServletContext context = new JerryMouseAppContext(urlPrefix);
+    private ServletContext addAppContext(String baseDir, String urlPrefix, ClassLoader classLoader) {
+        ServletContext context = new JerryMouseAppContext(baseDir, urlPrefix, classLoader);
         contextManager.registerServletContext(urlPrefix, context);
         return context;
     }
 
-    private void loadServletFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
+    private void loadServletFromWebXml(String urlPrefix, Document document, ClassLoader classLoader) {
         try {
             JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
 
@@ -111,15 +110,18 @@ public class WebXmlManager implements IWebXmlManager {
                 // 检查 <servlet-name> 是否存在于 <servlet> 元素中
                 if (map.containsKey(name)) {
                     ServletConfig config = map.get(name);
-                    // 加载class
-                    Class clazz = classLoader.loadClass(((JerryMouseServletConfig) config).getClazzName());
-                    HttpServlet httpServlet = (HttpServlet) clazz.newInstance();
-                    httpServlet.init(config);
+                    String clazzName = ((JerryMouseServletConfig) config).getClazzName();
+                    Class clazz = classLoader.loadClass(clazzName);
+                    // 加载class;
+                    HttpServlet httpServlet = (HttpServlet) clazz.getDeclaredConstructor().newInstance();
+                    // 对于springmvc 项目，DispatchServlet 的init，会根据param中的contextConfigLocation，设置location
                     /**
                      * 3. 注册对应的 url + servlet 到 context
                      */
                     appContext.registerServlet(urlPrefix + urlPattern, httpServlet);
-                    // servletManager.register(urlPrefix + urlPattern, httpServlet);
+                    // 设置当前webapp线程ClassLoader
+                    // Thread.currentThread().setContextClassLoader(classLoader);
+                    httpServlet.init(config);
                 }
             }
         } catch (Exception e) {
@@ -128,7 +130,7 @@ public class WebXmlManager implements IWebXmlManager {
         }
     }
 
-    private void loadFilterFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
+    private void loadFilterFromWebXml(String urlPrefix, Document document, ClassLoader classLoader) {
         try {
             JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
 
@@ -169,7 +171,7 @@ public class WebXmlManager implements IWebXmlManager {
         }
     }
 
-    private void loadListenerFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
+    private void loadListenerFromWebXml(String urlPrefix, Document document, ClassLoader classLoader) {
         try {
             JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
             Element rootElement = document.getRootElement();
@@ -184,16 +186,17 @@ public class WebXmlManager implements IWebXmlManager {
                 /**
                  * 2. 注册对应的 urlPrefix + listener
                  */
-                // listenerManager.register(urlPrefix, listener);
                 appContext.registerListener(listener);
             }
         } catch (InstantiationException | IllegalAccessException e) {
             logger.error("[JerryMouse] read web.xml failed", e);
             e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
         }
     }
 
-    private void loadContextParamFromWebXml(String urlPrefix, Document document, IClassLoader classLoader) {
+    private void loadContextParamFromWebXml(String urlPrefix, Document document, ClassLoader classLoader) {
         try {
             JerryMouseAppContext appContext = (JerryMouseAppContext) contextManager.getServletContext(urlPrefix);
             Element rootElement = document.getRootElement();
@@ -234,7 +237,11 @@ public class WebXmlManager implements IWebXmlManager {
         SAXReader saxReader = new SAXReader();
         try {
             Document document = saxReader.read(resourceAsStream);
-            loadFromWebXml("", document, new LocalClassloader());
+            final ServletContext context = addAppContext("", "/", new LocalClassloader());
+            // 本地
+            JerryMouseThreadPoolUtil.get().execute(() -> {
+                loadFromWebXml("", document, context);
+            });
         } catch (DocumentException e) {
             e.printStackTrace();
         }
@@ -255,7 +262,11 @@ public class WebXmlManager implements IWebXmlManager {
             logger.warn("[JerryMouse] webXmlPath={} not found", webXmlPath);
             return;
         }
-        loadAndRegisterWebapps(this.baseDirStr, prefix, webXmlFile, warDir);
+        final String urlPrefix = prefix;
+        // 每个webapp一个thread, 绑定各自的classLoader
+        JerryMouseThreadPoolUtil.get().execute(() -> {
+            loadAndRegisterWebapps(this.baseDirStr, urlPrefix, webXmlFile, warDir);
+        });
     }
     private String getWebXmlPath(File file) {
         return file.getAbsolutePath() + "/WEB-INF/web.xml";
@@ -265,24 +276,17 @@ public class WebXmlManager implements IWebXmlManager {
         try {
             SAXReader reader = new SAXReader();
             Document document = reader.read(webXmlFile);
-            // 自定义 class loader
-            Path classesPath = buildClassesPath(baseDir, warDir);
-            Path libPath = buildLibPath(baseDir, warDir);
-            // IClassLoader classLoader = new WebAppClassLoader(classesPath, libPath);
-            IClassLoader classLoader = new WebAppClassLoader(classesPath, libPath);
-            loadFromWebXml(urlPrefix, document, classLoader);
+            String basePath = JerryMouseResourceUtils.buildFullPath(baseDir, warDir.getName());
+            URL baseDirURL = new File(basePath).toURI().toURL();
+            // set classLoader
+            ClassLoader classLoader = new WebAppClassLoader(new URL[]{baseDirURL}, new LocalClassloader());
+            Thread.currentThread().setContextClassLoader(classLoader);
+            // 一个ServletContext对应一个app, 对应一个classLoader
+            ServletContext context = addAppContext(baseDirStr, urlPrefix, classLoader);
+            //
+            loadFromWebXml(urlPrefix, document, context);
         } catch (Exception e) {
             throw new JerryMouseException(e);
         }
-    }
-
-    private Path buildClassesPath(String baseDirStr, File warDir) {
-        String path = JerryMouseResourceUtils.buildFullPath(baseDirStr, warDir.getName() + "/WEB-INF/classes/");
-        return Paths.get(path);
-    }
-
-    private Path buildLibPath(String baseDirStr, File warDir) {
-        String path = JerryMouseResourceUtils.buildFullPath(baseDirStr, warDir.getName() + "/WEB-INF/lib/");
-        return Paths.get(path);
     }
 }

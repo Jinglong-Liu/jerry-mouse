@@ -41,7 +41,7 @@ public class ServletRequestDispatcher implements IRequestDispatcher {
         // 找到注册好的相应的 servlet 和 List<Filter>
         String requestUrl = request.getUrl();
         List<Filter> filters = filterManager.getMatchFilters(requestUrl);
-        HttpServlet httpServlet = servletManager.getServlet(requestUrl);
+        HttpServlet httpServlet = servletManager.getServlet(request.getRequestURI());
         if(Objects.isNull(httpServlet)) {
             logger.warn("[JerryMouse] requestUrl={} mapping not found", requestUrl);
             response.write(JerryMouseHttpUtils.http404Resp());

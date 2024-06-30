@@ -51,6 +51,8 @@ public class JerryMouseServerHandler extends ChannelInboundHandlerAdapter {
         IResponse response = new JerryMouseResponse(context);
 
         ServletContext appContext = contextManager.getServletContext(request);
+        // TODO: 重构
+        request.setServletContext(appContext);
         // 解析url， 匹配对应的ApplicationContext
         // 分发调用
         final RequestDispatcherContext dispatcherContext = new RequestDispatcherContext();

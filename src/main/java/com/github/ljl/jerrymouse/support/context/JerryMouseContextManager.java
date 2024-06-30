@@ -50,7 +50,7 @@ public class JerryMouseContextManager implements IContextManager {
     }
 
     private ServletContext getLocalContext() {
-        return getServletContext("");
+        return getServletContext("/");
     }
     private String getPrefix(String url) {
         if (url == null || url.isEmpty()) {
@@ -73,7 +73,10 @@ public class JerryMouseContextManager implements IContextManager {
 
     @Override
     public ServletContext getServletContext(String name) {
-        return contextMap.get(name);
+        if (contextMap.containsKey(name)) {
+            return contextMap.get(name);
+        }
+        return getLocalContext();
     }
 
     @Override

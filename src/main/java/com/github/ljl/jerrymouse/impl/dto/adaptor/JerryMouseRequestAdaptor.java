@@ -361,4 +361,20 @@ public abstract class JerryMouseRequestAdaptor implements IRequest {
     public DispatcherType getDispatcherType() {
         return null;
     }
+
+    @Override
+    public void setHeaders(Map<String, String> headers) {
+    }
+
+    @Override
+    public void setQueryParams(Map<String, String[]> queryParams) {
+    }
+
+    @Override
+    public void setInputStream(ServletInputStream inputStream) {
+    }
+
+    @Override
+    public void setServletContext(ServletContext servletContext) {
+    }
 }
