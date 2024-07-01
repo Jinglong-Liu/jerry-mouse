@@ -1,0 +1,51 @@
+<!DOCTYPE web-app PUBLIC
+        "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+        "http://java.sun.com/dtd/web-app_2_3.dtd" >
+
+<web-app version="2.4"
+         xmlns="http://java.sun.com/xml/ns/j2ee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd">
+
+  <display-name>webapp3</display-name>
+  <!--默认的欢迎页面-->
+  <welcome-file-list>
+    <welcome-file>/index.html</welcome-file>
+  </welcome-file-list>
+
+  <!-- Context Init Parameters -->
+  <context-param>
+    <param-name>context-init-param1-name</param-name>
+    <param-value>context-init-param1-value</param-value>
+  </context-param>
+  <context-param>
+    <param-name>context-init-param2-name</param-name>
+    <param-value>context-init-param2-value</param-value>
+  </context-param>
+
+  <!-- Servlet Configuration -->
+  <servlet>
+    <servlet-name>servlet-api-test-servlet</servlet-name>
+    <servlet-class>com.github.ljl.web.servlet.servlet.TestServletApiServlet</servlet-class>
+    <init-param>
+      <param-name>servlet-init-param1-name</param-name>
+      <param-value>servlet-init-param1-value</param-value>
+    </init-param>
+    <init-param>
+      <param-name>servlet-init-param2-name</param-name>
+      <param-value>servlet-init-param2-value</param-value>
+    </init-param>
+  </servlet>
+  <!-- Servlet Mapping -->
+  <servlet-mapping>
+    <servlet-name>servlet-api-test-servlet</servlet-name>
+    <url-pattern>/test/servletApi</url-pattern>
+  </servlet-mapping>
+
+  <!-- Context Attribute Setup (via ServletContextListener or programmatically in a Servlet) -->
+  <!-- Assuming we are setting these context attributes somewhere in your application startup -->
+  <listener>
+    <listener-class>com.github.ljl.web.servlet.listener.MyServletContextListener</listener-class>
+  </listener>
+
+</web-app>
