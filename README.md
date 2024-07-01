@@ -2883,3 +2883,214 @@ git tag -a v0.8.2 -m "support-springmvc-demo"
 ```
 
 // 本章节文档未完善，简要记录，后续补充
+
+
+
+## 9、SpringBoot
+
+需求：
+拆分jerry-mouse maven module如下
+
+```
+jerry-mouse/                     # 父工程jerry-mouse目录
+│
+├── pom.xml                      # jerry-mouse的 POM 文件
+│
+├── jerry-mouse-server/          # 原jerry-mouse模块，提供类似Tomcat的web-server服务
+│   ├── src/
+│   │   ├── main/
+│   │   └── test/
+│   └── pom.xml                  # jerry-mouse-server 的 POM 文件
+│
+└── springboot-webapp1/          # 子模块：springboot application demo
+    ├── src/
+    │   ├── main/
+    │   └── test/
+    └── pom.xml                  # 子模块的 POM 文件，依赖 jerry-mouse-server
+```
+
+其中springboot-webapp1的pom如下
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>jerry-mouse</artifactId>
+        <groupId>org.example</groupId>
+        <version>0.9.0</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>springboot-webapp1</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>2.6.3</version>
+            <exclusions>
+                <!--剔除Tomcat的支持-->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-tomcat</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+                <!--采用jerry-mouse作为webserver-->
+            <groupId>org.example</groupId>
+            <artifactId>jerry-mouse-server</artifactId>
+            <version>0.9.0</version>
+        </dependency>
+    </dependencies>
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+    </properties>
+    <build>
+        <plugins>
+            <!-- Spring Boot Maven 插件 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+springboot-webapp1的包结构
+```
+springboot-webapp1/                                     # 根目录
+│
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/<your package>/springboot           # 自定义包名
+│   │   │       └── springboot/
+│   │   │           ├── SpringBootApp1.java             # 主应用类
+│   │   │           │
+│   │   │           ├── config/
+│   │   │           │   └── WebServerConfig.java        # 配置类
+│   │   │           │
+│   │   │           └── controller/
+│   │   │               └── HelloController.java        # 控制器类
+│   │   │
+│   │   └── resources/
+│   │       └── application.properties(可选）            # 应用配置文件
+│   │
+│   └── test/(可选)
+│
+└── pom.xml                                            # Maven POM 文件
+```
+
+SpringBootApp1.java 如下(省略import，下同)
+```java
+@SpringBootApplication
+public class SpringBootApp1 {
+    public static void main(String[] args) {
+        SpringApplication.run(SpringBootApp1.class, args);
+    }
+}
+```
+HelloController.java 如下
+```java
+@RestController("/")
+public class HelloController {
+    @GetMapping(value = "hello")
+    String hello() {
+        return "hello springboot";
+    }
+}
+```
+
+要求继续完善JerryMouse项目，以及完成webServer工厂配置类WebServerConfig
+
+启动SpringBootApp1，可以正常启动webapp监听端口。
+
+发送请求
+```bash
+# 后面的参数作为干扰，可省略
+GET http://127.0.0.1:8080/hello?key1=value1&key2=value2&key2=value3
+```
+正确响应，并返回
+```
+hello springboot
+```
+
+
+
+分析
+```java
+public class ServletWebServerApplicationContext extends GenericWebApplicationContext
+        implements ConfigurableWebServerApplicationContext {
+    
+    private org.springframework.boot.web.servlet.ServletContextInitializer getSelfInitializer() {
+        return this::selfInitialize;
+    }
+
+    private void selfInitialize(ServletContext servletContext) throws ServletException {
+        prepareWebApplicationContext(servletContext);
+        registerApplicationScope(servletContext);
+        WebApplicationContextUtils.registerEnvironmentBeans(getBeanFactory(), servletContext);
+        for (ServletContextInitializer beans : getServletContextInitializerBeans()) {
+            beans.onStartup(servletContext);
+        }
+    }
+
+    private void createWebServer() {
+        WebServer webServer = this.webServer;
+        ServletContext servletContext = getServletContext();
+        if (webServer == null && servletContext == null) {
+            StartupStep createWebServer = this.getApplicationStartup().start("spring.boot.webserver.create");
+            ServletWebServerFactory factory = getWebServerFactory();
+            createWebServer.tag("factory", factory.getClass().toString());
+            this.webServer = factory.getWebServer(getSelfInitializer());
+            createWebServer.end();
+            getBeanFactory().registerSingleton("webServerGracefulShutdown",
+                    new WebServerGracefulShutdownLifecycle(this.webServer));
+            getBeanFactory().registerSingleton("webServerStartStop",
+                    new WebServerStartStopLifecycle(this, this.webServer));
+        }
+        else if (servletContext != null) {
+            try {
+                getSelfInitializer().onStartup(servletContext);
+            }
+            catch (ServletException ex) {
+                throw new ApplicationContextException("Cannot initialize servlet context", ex);
+            }
+        }
+        initPropertySources();
+    }
+}
+```
+
+
+```java
+package org.springframework.boot.web.servlet.context;
+public class ServletRegistrationBean<T extends Servlet> extends DynamicRegistrationBean<ServletRegistration.Dynamic> {
+    @Override
+	protected ServletRegistration.Dynamic addRegistration(String description, ServletContext servletContext) {
+		String name = getServletName();
+		return servletContext.addServlet(name, this.servlet);
+	}
+}
+```
+### 测试
+
+HelloController demo 已跑通
+
+// TODO： 本章文档未完善，待补充
+
+### 代码实现
+第一版已加急完成，1 Day, 非常烂 shit mountain(说明前面有设计不合理之处)，但你就说能不能跑吧。
+
+主要收获是过了一遍springboot启动流程，dispatcherServlet怎么创建，怎么绑定由Tomcat或者JerryMouse创建的ServletContext
+
+以及Dynamic addServlet的一些操作
+
+预计下周优化代码, 总结经验，完善文档。然而完善代码，完善测试，并打二周目
+
+目前提交如下
+
+[jerry-mouse] v0.9.0 embed jerry-mouse-server support springboot demo
