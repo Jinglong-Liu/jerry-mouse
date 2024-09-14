@@ -1,8 +1,18 @@
 package com.github.ljl.wheel.jerrymouse.server.nio.handler;
 
 import com.github.ljl.wheel.jerrymouse.exception.ReactorException;
+import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContextManager;
+import com.github.ljl.wheel.jerrymouse.support.dispatcher.RequestDispatcher;
+import com.github.ljl.wheel.jerrymouse.support.dispatcher.RequestDispatcherContext;
+import com.github.ljl.wheel.jerrymouse.support.servlet.request.RequestImpl;
+import com.github.ljl.wheel.jerrymouse.support.servlet.response.ResponseImpl;
 import com.github.ljl.wheel.jerrymouse.utils.HttpUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -19,8 +29,9 @@ import java.util.List;
  * @create: 2024-09-14 10:05
  **/
 
-public class ReadChannelHandler implements ChannelHandler, Closeable {
+public class ReadChannelHandler implements ChannelHandler, Closeable, SocketWriter {
 
+    private Logger logger = LoggerFactory.getLogger(getClass());
     public static final int BUF_SIZE = 1024;
     private final SelectionKey key;
     private final SocketChannel sc;
@@ -41,16 +52,21 @@ public class ReadChannelHandler implements ChannelHandler, Closeable {
                 bytes[i] = msg.get(i);
             }
 
-            // receive message
             String message = new String(bytes, StandardCharsets.UTF_8);
-
-            System.out.println("receive message:\n" + message);
-
-            String result = HttpUtils.http200Resp("Hello Reactor!");
-            byte[] returnBytes = result.getBytes(StandardCharsets.UTF_8);
-
-            // write back
-            writeChannel(returnBytes);
+            if (message.isEmpty()) {
+                logger.error("empty message!");
+                this.close();
+                return;
+            }
+            logger.debug("receive request message:\n{}", message);
+            // till now, there is only one application, one context
+            ServletContext servletContext = ApplicationContextManager.getApplicationContext();
+            HttpServletRequest request = new RequestImpl(message, servletContext);
+            // client can use response to write data, so the socketWrite is necessary
+            HttpServletResponse response = new ResponseImpl(this, servletContext);
+            RequestDispatcherContext dispatcherContext = new RequestDispatcherContext(request, response);
+            // then, only focus on this
+            RequestDispatcher.get().dispatch(dispatcherContext);
 
             this.close();
         }
@@ -111,5 +127,15 @@ public class ReadChannelHandler implements ChannelHandler, Closeable {
             }
         } catch (IOException ignored) {
         }
+    }
+
+    @Override
+    public void write(byte[] data) {
+        writeChannel(data);
+    }
+
+    @Override
+    public void write(String data) {
+        write(data.getBytes(StandardCharsets.UTF_8));
     }
 }
