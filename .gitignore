@@ -17,3 +17,6 @@ buildNumber.properties
 .classpath
 .idea/
 *.iml
+logs/
+*.log
+
