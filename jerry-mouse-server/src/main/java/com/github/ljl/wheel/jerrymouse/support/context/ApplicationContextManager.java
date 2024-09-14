@@ -14,7 +14,6 @@ public class ApplicationContextManager {
 
     static {
         applicationContext = new ApplicationContext();
-        applicationContext.registerServlet("/hello", new HelloServlet());
     }
     public static ApplicationContext getApplicationContext() {
         return applicationContext;
