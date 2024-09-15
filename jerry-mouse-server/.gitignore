@@ -1,0 +1,4 @@
+target/
+*.iml
+src/test/webapps/*
+!src/test/webapps/*.war
