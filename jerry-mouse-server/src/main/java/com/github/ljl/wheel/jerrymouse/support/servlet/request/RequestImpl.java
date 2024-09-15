@@ -45,27 +45,27 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public long getDateHeader(String name) {
-        return 0;
+        return requestData.getDateHeader(name);
     }
 
     @Override
     public String getHeader(String name) {
-        return null;
+        return requestData.getHeader(name);
     }
 
     @Override
     public Enumeration<String> getHeaders(String name) {
-        return null;
+        return requestData.getHeaders(name);
     }
 
     @Override
     public Enumeration<String> getHeaderNames() {
-        return null;
+        return requestData.getHeaderNames();
     }
 
     @Override
     public int getIntHeader(String name) {
-        return 0;
+        return requestData.getIntHeader(name);
     }
 
     @Override
@@ -195,22 +195,22 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public Object getAttribute(String name) {
-        return null;
+        return requestData.getAttribute(name);
     }
 
     @Override
     public Enumeration<String> getAttributeNames() {
-        return null;
+        return requestData.getAttributeNames();
     }
 
     @Override
     public String getCharacterEncoding() {
-        return null;
+        return requestData.getCharacterEncoding();
     }
 
     @Override
     public void setCharacterEncoding(String env) throws UnsupportedEncodingException {
-
+        requestData.setCharacterEncoding(env);
     }
 
     @Override
@@ -235,22 +235,22 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public String getParameter(String name) {
-        return null;
+        return requestData.getParameter(name);
     }
 
     @Override
     public Enumeration<String> getParameterNames() {
-        return null;
+        return requestData.getParameterNames();
     }
 
     @Override
     public String[] getParameterValues(String name) {
-        return new String[0];
+        return requestData.getParameterValues(name);
     }
 
     @Override
     public Map<String, String[]> getParameterMap() {
-        return null;
+        return requestData.getParameterMap();
     }
 
     @Override
@@ -290,12 +290,12 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public void setAttribute(String name, Object o) {
-
+        requestData.setAttribute(name, o);
     }
 
     @Override
     public void removeAttribute(String name) {
-
+        requestData.removeAttribute(name);
     }
 
     @Override

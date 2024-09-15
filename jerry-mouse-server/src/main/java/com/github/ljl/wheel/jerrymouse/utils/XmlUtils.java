@@ -4,6 +4,7 @@ import com.github.ljl.wheel.jerrymouse.support.classloader.WebApplicationClassLo
 import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContext;
 import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContextManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.config.ServletConfigWrapper;
+import com.github.ljl.wheel.jerrymouse.support.servlet.filter.FilterConfigImpl;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -11,6 +12,7 @@ import org.dom4j.io.SAXReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.Filter;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -111,6 +113,7 @@ public class XmlUtils {
     private static void loadFromWebXml(String appName, Document document, ClassLoader classLoader) {
         loadContextFromWebXml(appName, document);
         loadServletFromWebXml(appName, document, classLoader);
+        loadFilterFromWebXml(appName, document, classLoader);
     }
     private static void loadContextFromWebXml(String appName, Document document) {
         /**
@@ -175,6 +178,60 @@ public class XmlUtils {
                      * 4. 绑定servlet和对应的config, 并初始化
                      */
                     httpServlet.init(config);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("load server from web.xml failed", e);
+            e.printStackTrace();
+        }
+    }
+    private static void loadFilterFromWebXml(String appName, Document document, ClassLoader classLoader) {
+        try {
+            ApplicationContext applicationContext = ApplicationContextManager.getApplicationContext(appName);
+
+            Element rootElement = document.getRootElement();
+            List<Element> selectNodes = rootElement.elements("filter");
+            Map<String, FilterConfigImpl> map = new HashMap<>();
+
+            /**
+             * 格式类似servlet
+             */
+            for (Element element : selectNodes) {
+                String name = element.elementText("filter-name");
+                String className = element.elementText("filter-class");
+                FilterConfigImpl filterConfig = new FilterConfigImpl(name, className, applicationContext);
+                map.put(name, filterConfig);
+
+                List<Element> initParamElements = element.elements("init-param");
+                initParamElements.stream().forEach(param -> {
+                    String paramName = param.elementText("param-name");
+                    String paramValue = param.elementText("param-value");
+                    // set init parameter
+                    filterConfig.setInitParameter(paramName, paramValue);
+                });
+            }
+            /**
+             * 2, 根据filter-name找到<filter-mapping>中与其匹配的<url-pattern>
+             */
+            List<Element> mappingElements = rootElement.elements("filter-mapping");
+            for (Element mappingElement : mappingElements) {
+                String name = mappingElement.elementText("filter-name");
+                String urlPattern = mappingElement.elementText("url-pattern");
+                // 检查 <servlet-name> 是否存在于 <servlet> 元素中
+                if (map.containsKey(name)) {
+                    FilterConfigImpl config = map.get(name);
+                    String clazzName = config.getClassName();
+                    Class<?> clazz = classLoader.loadClass(clazzName);
+                    // 加载class;
+                    Filter filter = (Filter) clazz.getDeclaredConstructor().newInstance();
+                    /**
+                     * 3. 注册对应的 url + filter 到 context
+                     */
+                    applicationContext.registerFilter(appName + urlPattern, filter);
+                    /**
+                     * 4. 绑定filter和对应的config, 并初始化
+                     */
+                    filter.init(config);
                 }
             }
         } catch (Exception e) {
