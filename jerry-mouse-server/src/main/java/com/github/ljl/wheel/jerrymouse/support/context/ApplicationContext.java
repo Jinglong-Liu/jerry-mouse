@@ -2,7 +2,11 @@ package com.github.ljl.wheel.jerrymouse.support.context;
 
 import com.github.ljl.wheel.jerrymouse.support.manager.ServletManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.filter.FilterManager;
+import com.github.ljl.wheel.jerrymouse.support.servlet.listener.ListenerManager;
 import lombok.Setter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.servlet.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.http.HttpServlet;
@@ -12,6 +16,8 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * @program: jerry-mouse
@@ -21,6 +27,10 @@ import java.util.*;
  **/
 
 public class ApplicationContext implements ServletContext {
+
+    private static Logger logger = LoggerFactory.getLogger(ApplicationContext.class);
+
+    private ClassLoader classLoader;
 
     private String appName;
 
@@ -32,14 +42,19 @@ public class ApplicationContext implements ServletContext {
     @Setter
     private HttpServletResponse response;
 
-    private FilterManager filterManager = new FilterManager();
+    private final FilterManager filterManager = new FilterManager();
 
-    private ServletManager servletManager = new ServletManager();
+    private final ServletManager servletManager = new ServletManager();
 
-    private Map<String, String> initParameterMap = new HashMap<>();
+    private final ListenerManager listenerManager = new ListenerManager();
 
-    public ApplicationContext(String appName) {
+    private final Map<String, String> initParameterMap = new HashMap<>();
+
+    private final Map<String, Object> attributesMap = new ConcurrentHashMap<>();
+
+    public ApplicationContext(String appName, ClassLoader classLoader) {
         this.appName = appName;
+        this.classLoader = classLoader;
     }
 
     @Override
@@ -107,14 +122,18 @@ public class ApplicationContext implements ServletContext {
         return servletManager.getServlet(name);
     }
 
+    @Deprecated
     @Override
     public Enumeration<Servlet> getServlets() {
-        return null;
+        logger.error("getServlets() is Deprecated in this version");
+        return Collections.emptyEnumeration();
     }
 
+    @Deprecated
     @Override
     public Enumeration<String> getServletNames() {
-        return null;
+        logger.error("getServletNames() is Deprecated in this version");
+        return Collections.emptyEnumeration();
     }
 
     @Override
@@ -154,31 +173,59 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public boolean setInitParameter(String name, String value) {
-        if (initParameterMap.containsKey(name)) {
-            return false;
+        synchronized (initParameterMap) {
+            if (initParameterMap.containsKey(name)) {
+                return false;
+            }
+            initParameterMap.put(name, value);
+            return true;
         }
-        initParameterMap.put(name, value);
-        return true;
     }
 
     @Override
     public Object getAttribute(String name) {
-        return null;
+        return attributesMap.get(name);
     }
 
     @Override
     public Enumeration<String> getAttributeNames() {
-        return null;
+        return Collections.enumeration(attributesMap.keySet());
     }
 
     @Override
     public void setAttribute(String name, Object object) {
+        List<ServletContextAttributeListener> listeners = getListenersByType(ServletContextAttributeListener.class);
+        ServletContextAttributeEvent contextEvent = new ServletContextAttributeEvent(this, name, object);
 
+        synchronized (attributesMap) {
+            if (!attributesMap.containsKey(name)) {
+                attributesMap.put(name, object);
+                // add
+                listeners.forEach(listener -> listener.attributeAdded(contextEvent));
+            } else if (!attributesMap.get(name).equals(object)){
+                attributesMap.put(name, object);
+                // replace
+                listeners.forEach(listener -> listener.attributeReplaced(contextEvent));
+            } else {
+                // do nothing
+            }
+        }
     }
 
     @Override
     public void removeAttribute(String name) {
-
+        if(attributesMap.containsKey(name)) {
+            synchronized (attributesMap) {
+                if (attributesMap.containsKey(name)) {
+                    Object value = attributesMap.get(name);
+                    attributesMap.remove(name);
+                    // remove
+                    List<ServletContextAttributeListener> listeners = getListenersByType(ServletContextAttributeListener.class);
+                    ServletContextAttributeEvent contextEvent = new ServletContextAttributeEvent(this, name, value);
+                    listeners.forEach(listener -> listener.attributeRemoved(contextEvent));
+                }
+            }
+        }
     }
 
     @Override
@@ -273,21 +320,40 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public void addListener(String className) {
-
+        try {
+            Class<? extends EventListener> listenerClass = (Class<? extends EventListener>) classLoader.loadClass(className);
+            addListener(listenerClass);
+        } catch (ClassNotFoundException | ClassCastException e) {
+            logger.error("load listener class error, className = {}", className);
+            e.printStackTrace();
+        }
     }
 
     @Override
     public <T extends EventListener> void addListener(T t) {
-
+        listenerManager.register(t);
     }
 
     @Override
     public void addListener(Class<? extends EventListener> listenerClass) {
-
+        try {
+            EventListener listener = listenerClass.newInstance();
+            addListener(listener);
+        } catch (InstantiationException | IllegalAccessException e) {
+            logger.error("create listener object error, className = {}", listenerClass.getName());
+            e.printStackTrace();
+        }
     }
 
     @Override
     public <T extends EventListener> T createListener(Class<T> clazz) throws ServletException {
+        try {
+            EventListener listener = clazz.newInstance();
+            addListener(listener);
+            return (T) listener;
+        } catch (InstantiationException | IllegalAccessException e) {
+            e.printStackTrace();
+        }
         return null;
     }
 
@@ -298,7 +364,7 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public ClassLoader getClassLoader() {
-        return null;
+        return classLoader;
     }
 
     @Override
@@ -353,5 +419,46 @@ public class ApplicationContext implements ServletContext {
     }
     public void registerFilter(String urlPattren, Filter filter) {
         filterManager.register(urlPattren, filter);
+    }
+
+    public void initializeServletContextListeners() {
+        this.getListenersByType(ServletContextListener.class).forEach(listener -> {
+            listener.contextInitialized(new ServletContextEvent(this));
+        });
+    }
+
+    public void initializeRequest(ServletRequest request) {
+        this.getListenersByType(ServletRequestListener.class).forEach(listener -> {
+            listener.requestInitialized(new ServletRequestEvent(this, request));
+        });
+    }
+
+    public void destroyRequest(ServletRequest request) {
+        this.getListenersByType(ServletRequestListener.class).forEach(listener -> {
+            listener.requestDestroyed(new ServletRequestEvent(this, request));
+        });
+    }
+    // ServletRequestAttributeListener
+    public void requestAttributeAdded(ServletRequest request, String name, Object object) {
+        this.getListenersByType(ServletRequestAttributeListener.class).forEach(listener -> {
+            listener.attributeAdded(new ServletRequestAttributeEvent(this, request, name, object));
+        });
+    }
+    public void requestAttributeRemoved(ServletRequest request, String name, Object value) {
+        this.getListenersByType(ServletRequestAttributeListener.class).forEach(listener -> {
+            listener.attributeRemoved(new ServletRequestAttributeEvent(this, request, name, value));
+        });
+    }
+    public void requestAttributeReplaced(ServletRequest request, String name, Object value) {
+        this.getListenersByType(ServletRequestAttributeListener.class).forEach(listener -> {
+            listener.attributeReplaced(new ServletRequestAttributeEvent(this, request, name, value));
+        });
+    }
+    private <T extends EventListener> List<T> getListenersByType(Class<T> eventType) {
+        return listenerManager.getListeners()
+                .stream()
+                .filter(eventType::isInstance)
+                .map(eventType::cast)
+                .collect(Collectors.toList());
     }
 }
