@@ -1,5 +1,6 @@
 package com.github.ljl.wheel.jerrymouse.support.servlet.request;
 
+import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContext;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +32,7 @@ public class RequestImpl implements HttpServletRequest {
     private ServletContext servletContext;
 
     public RequestImpl(String message) {
-        this.requestData =new  RequestData(message);
+        this.requestData = new  RequestData(this, message);
     }
     @Override
     public String getAuthType() {
@@ -215,17 +216,17 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public int getContentLength() {
-        return 0;
+        return requestData.getContentLength();
     }
 
     @Override
     public long getContentLengthLong() {
-        return 0;
+        return requestData.getContentLengthLong();
     }
 
     @Override
     public String getContentType() {
-        return null;
+        return requestData.getContentType();
     }
 
     @Override
@@ -376,5 +377,19 @@ public class RequestImpl implements HttpServletRequest {
     @Override
     public DispatcherType getDispatcherType() {
         return null;
+    }
+
+    public void setServletContext(ServletContext servletContext) {
+        this.servletContext = servletContext;
+        init();
+    }
+    public void init() {
+        ApplicationContext applicationContext = (ApplicationContext) servletContext;
+        applicationContext.initializeRequest(this);
+    }
+
+    public void destroy() {
+        ApplicationContext applicationContext = (ApplicationContext) this.servletContext;
+        applicationContext.destroyRequest(this);
     }
 }

@@ -39,7 +39,7 @@ public class XmlUtils {
         // 指定类加载器，用以加载资源以及反射加载类，创建对象
         ClassLoader classLoader = XmlUtils.class.getClassLoader();
         InputStream resourceAsStream = classLoader.getResourceAsStream("web.xml");
-        ApplicationContextManager.applyApplicationContext("/root");
+        ApplicationContextManager.applyApplicationContext("/root", classLoader);
         SAXReader saxReader = new SAXReader();
         try {
             Document document = saxReader.read(resourceAsStream);
@@ -89,6 +89,9 @@ public class XmlUtils {
         URL url = appDir.toURI().toURL();
         // 构造对应app的
         ClassLoader classLoader = new WebApplicationClassLoader(new URL[]{url}, XmlUtils.class.getClassLoader());
+
+        Thread.currentThread().setContextClassLoader(classLoader);
+
         File webXml = new File(appDir, "WEB-INF/web.xml");
 
         InputStream resourceAsStream;
@@ -101,7 +104,7 @@ public class XmlUtils {
 
         SAXReader saxReader = new SAXReader();
         String appName = "/" + appDir.getName(); // lastname, 并以/开头
-        ApplicationContextManager.applyApplicationContext(appName);// apply servlet context
+        ApplicationContextManager.applyApplicationContext(appName, classLoader);// apply servlet context
         try {
             Document document = saxReader.read(resourceAsStream);
             loadFromWebXml(appName, document, classLoader);
@@ -111,9 +114,13 @@ public class XmlUtils {
         }
     }
     private static void loadFromWebXml(String appName, Document document, ClassLoader classLoader) {
+        ApplicationContext applicationContext = ApplicationContextManager.getApplicationContext(appName);
         loadContextFromWebXml(appName, document);
         loadServletFromWebXml(appName, document, classLoader);
         loadFilterFromWebXml(appName, document, classLoader);
+        loadListenerFromWebXml(appName, document);
+        applicationContext.initializeServletContextListeners();
+
     }
     private static void loadContextFromWebXml(String appName, Document document) {
         /**
@@ -236,6 +243,29 @@ public class XmlUtils {
             }
         } catch (Exception e) {
             logger.error("load server from web.xml failed", e);
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * <listener>
+     *     <listener-class></listener-class>
+     * </listener>
+     */
+    private static void loadListenerFromWebXml(String appName, Document document) {
+        try {
+            ApplicationContext applicationContext = ApplicationContextManager.getApplicationContext(appName);
+
+            Element rootElement = document.getRootElement();
+            List<Element> selectNodes = rootElement.elements("listener");
+
+            for (Element element : selectNodes) {
+                String className = element.elementText("listener-class");
+                // servletContext负责创建
+                applicationContext.addListener(className);
+            }
+        } catch (Exception e) {
+            logger.error("load listener from web.xml failed", e);
             e.printStackTrace();
         }
     }

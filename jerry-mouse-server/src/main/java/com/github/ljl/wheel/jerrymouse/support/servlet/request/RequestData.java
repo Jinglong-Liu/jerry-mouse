@@ -1,11 +1,13 @@
 package com.github.ljl.wheel.jerrymouse.support.servlet.request;
 
+import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContext;
 import com.github.ljl.wheel.jerrymouse.utils.HttpUtils;
 import lombok.Data;
 import lombok.Getter;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
+import javax.servlet.ServletRequest;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
 import java.util.Collections;
@@ -34,7 +36,7 @@ public class RequestData {
 
     private Map<String, String[]> parameters;
 
-    private Map<String, Object[]> attributes = new HashMap<>();
+    private final Map<String, Object> attributes = new HashMap<>();
 
     private String body;
 
@@ -44,11 +46,13 @@ public class RequestData {
 
     private String requestURI;
 
+    private final ServletRequest request;
+
     @Getter
     private ServletInputStream inputStream;
 
-    public RequestData(String requestMessage) {
-        this.requestMessage = requestMessage;
+    public RequestData(ServletRequest request, String requestMessage) {
+        this.request = request;
         this.headers = RequestParser.parseHeaders(requestMessage);
         this.parameters = RequestParser.parseQueryParams(requestMessage);
         this.body = RequestParser.parseRequestBody(requestMessage);
@@ -107,19 +111,36 @@ public class RequestData {
     }
 
     public void removeAttribute(String name) {
-        if (attributes.containsKey(name)) {
-            attributes.remove(name);
+        synchronized (attributes) {
+            if (attributes.containsKey(name)) {
+                Object value = attributes.get(name);
+                attributes.remove(name);
+                // removed
+                ApplicationContext applicationContext = (ApplicationContext) request.getServletContext();
+                applicationContext.requestAttributeRemoved(request, name, value);
+            }
         }
     }
     public void setAttribute(String name, Object o) {
-        attributes.put(name, new Object[]{o});
+        synchronized (attributes) {
+            if (attributes.containsKey(name)) {
+                if (!attributes.get(name).equals(o)) {
+                    attributes.put(name, o);
+                    // replaced
+                    ApplicationContext applicationContext = (ApplicationContext) request.getServletContext();
+                    applicationContext.requestAttributeReplaced(request, name, o);
+                }
+            } else {
+                // added
+                attributes.put(name, o);
+                ApplicationContext applicationContext = (ApplicationContext) request.getServletContext();
+                applicationContext.requestAttributeAdded(request, name, o);
+            }
+        }
     }
 
     public Object getAttribute(String name) {
-        if (attributes.containsKey(name)) {
-            return attributes.get(name)[0];
-        }
-        return null;
+        return attributes.get(name);
     }
     public Enumeration<String> getAttributeNames() {
         return Collections.enumeration(attributes.keySet());

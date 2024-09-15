@@ -18,8 +18,8 @@ public class ApplicationContextManager {
         applicationContextMap = new ConcurrentHashMap<>();
     }
 
-    public static ApplicationContext applyApplicationContext(String appName) {
-        ApplicationContext context = new ApplicationContext(appName);
+    public static ApplicationContext applyApplicationContext(String appName, ClassLoader classLoader) {
+        ApplicationContext context = new ApplicationContext(appName, classLoader);
         applicationContextMap.put(appName, context);
         return context;
     }
