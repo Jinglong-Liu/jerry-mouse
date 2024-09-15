@@ -1,5 +1,6 @@
 package com.github.ljl.wheel.jerrymouse.support.servlet.request;
 
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,11 +27,11 @@ public class RequestImpl implements HttpServletRequest {
 
     private RequestData requestData;
 
+    @Setter
     private ServletContext servletContext;
 
-    public RequestImpl(String message, ServletContext servletContext) {
+    public RequestImpl(String message) {
         this.requestData =new  RequestData(message);
-        this.servletContext = servletContext;
     }
     @Override
     public String getAuthType() {
