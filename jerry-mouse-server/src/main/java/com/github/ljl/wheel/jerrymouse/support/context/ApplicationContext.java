@@ -1,6 +1,7 @@
 package com.github.ljl.wheel.jerrymouse.support.context;
 
 import com.github.ljl.wheel.jerrymouse.support.manager.ServletManager;
+import com.github.ljl.wheel.jerrymouse.support.servlet.filter.FilterManager;
 import lombok.Setter;
 import javax.servlet.*;
 import javax.servlet.descriptor.JspConfigDescriptor;
@@ -30,6 +31,8 @@ public class ApplicationContext implements ServletContext {
 
     @Setter
     private HttpServletResponse response;
+
+    private FilterManager filterManager = new FilterManager();
 
     private ServletManager servletManager = new ServletManager();
 
@@ -343,5 +346,12 @@ public class ApplicationContext implements ServletContext {
     }
     public void registerServlet(String uri, HttpServlet httpServlet) {
         servletManager.register(uri, httpServlet);
+    }
+
+    public List<Filter> getMatchFilters(String urlPattern) {
+        return filterManager.getMatchFilters(urlPattern);
+    }
+    public void registerFilter(String urlPattren, Filter filter) {
+        filterManager.register(urlPattren, filter);
     }
 }

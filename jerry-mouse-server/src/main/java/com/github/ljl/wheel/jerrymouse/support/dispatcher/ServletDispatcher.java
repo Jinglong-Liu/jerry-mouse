@@ -1,15 +1,17 @@
 package com.github.ljl.wheel.jerrymouse.support.dispatcher;
 
 import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContext;
+import com.github.ljl.wheel.jerrymouse.support.servlet.filter.FilterChainImpl;
 import com.github.ljl.wheel.jerrymouse.support.servlet.response.ResponseImpl;
 import com.github.ljl.wheel.jerrymouse.utils.HttpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletException;
+import javax.servlet.*;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * @program: jerry-mouse
@@ -29,8 +31,10 @@ public class ServletDispatcher implements IDispatcher {
         //TODO: use uriPattern
         ApplicationContext applicationContext = (ApplicationContext) request.getServletContext();
         HttpServlet httpServlet = applicationContext.getServletByURI(request.getRequestURI());
+        List<Filter> filterList = applicationContext.getMatchFilters(request.getRequestURI());
         try {
-            httpServlet.service(request, response);
+            // httpServlet.service(request, response);
+            filter(httpServlet, request, response, filterList);
         } catch (NullPointerException e) {
             logger.error("Servlet not found!");
             response.getSockerWriter().write(HttpUtils.http404Resp());
@@ -39,5 +43,14 @@ public class ServletDispatcher implements IDispatcher {
             e.printStackTrace();
             response.getSockerWriter().write(HttpUtils.http500Resp(e));
         }
+    }
+
+    private void filter(HttpServlet httpServlet,
+                        ServletRequest request,
+                        ServletResponse response,
+                        List<Filter> filterList)
+            throws ServletException, IOException {
+        FilterChain chain = new FilterChainImpl(filterList, httpServlet);
+        chain.doFilter(request, response);
     }
 }
