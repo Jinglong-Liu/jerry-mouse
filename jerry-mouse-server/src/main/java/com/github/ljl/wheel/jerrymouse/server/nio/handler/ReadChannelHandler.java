@@ -60,8 +60,12 @@ public class ReadChannelHandler implements ChannelHandler, Closeable, SocketWrit
             }
             logger.debug("receive request message:\n{}", message);
             // till now, there is only one application, one context
-            ServletContext servletContext = ApplicationContextManager.getApplicationContext();
-            HttpServletRequest request = new RequestImpl(message, servletContext);
+            // 通过URL查找到对应的context
+
+            RequestImpl request = new RequestImpl(message);
+            ServletContext servletContext = ApplicationContextManager.getApplicationContext(request);
+            request.setServletContext(servletContext);
+
             // client can use response to write data, so the socketWrite is necessary
             HttpServletResponse response = new ResponseImpl(this, servletContext);
             RequestDispatcherContext dispatcherContext = new RequestDispatcherContext(request, response);

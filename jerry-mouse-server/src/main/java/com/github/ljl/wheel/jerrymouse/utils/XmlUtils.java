@@ -1,5 +1,6 @@
 package com.github.ljl.wheel.jerrymouse.utils;
 
+import com.github.ljl.wheel.jerrymouse.support.classloader.WebApplicationClassLoader;
 import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContext;
 import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContextManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.config.ServletConfigWrapper;
@@ -11,11 +12,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.stream.Collectors;
+
 /**
  * @program: jerry-mouse
  * @description:
@@ -29,23 +37,101 @@ public class XmlUtils {
         // 指定类加载器，用以加载资源以及反射加载类，创建对象
         ClassLoader classLoader = XmlUtils.class.getClassLoader();
         InputStream resourceAsStream = classLoader.getResourceAsStream("web.xml");
+        ApplicationContextManager.applyApplicationContext("/root");
         SAXReader saxReader = new SAXReader();
         try {
             Document document = saxReader.read(resourceAsStream);
-            // 本地servlet不用前缀
-            loadFromWebXml("", document, classLoader);
+            // 本地前缀设置为/root
+            loadFromWebXml("/root", document, classLoader);
         } catch (DocumentException e) {
             logger.error("read web.xml error");
             e.printStackTrace();
         }
     }
-    private static void loadFromWebXml(String urlPrefix, Document document, ClassLoader classLoader) {
-        loadServletFromWebXml(urlPrefix, document, classLoader);
+
+    public static void loadApps(String baseDir, Set<String> appNameSet) {
+        File dir = new File(baseDir);
+
+        // filter subDirs
+        final List<File> subDirs = Arrays.stream(Objects.requireNonNull(dir.listFiles()))
+                .filter(File::isDirectory)
+                .filter(subdir -> appNameSet.contains(subdir.getName()))
+                .collect(Collectors.toList());
+
+        CountDownLatch latch = new CountDownLatch(subDirs.size());
+
+        subDirs.forEach(subDir -> {
+            ThreadPoolUtils.execute(() -> {
+                try {
+                    parseAppWebXml(subDir);
+                    logger.debug("Load app " + subDir.getName() + " end");
+                } catch (MalformedURLException e) {
+                    logger.error("Load app " + subDir.getName() + " failed");
+                    e.printStackTrace();
+                } finally {
+                    latch.countDown();
+                }
+            });
+        });
+        try {
+            latch.await();
+            logger.info("Finish load {} webapps", subDirs.size());
+        } catch (InterruptedException e) {
+            logger.error("count down latch await error when finish load webapps");
+            e.printStackTrace();
+        }
     }
-    private static void loadServletFromWebXml(String urlPrefix, Document document, ClassLoader classLoader) {
+
+    public static void parseAppWebXml(File appDir) throws MalformedURLException {
+
+        URL url = appDir.toURI().toURL();
+        // 构造对应app的
+        ClassLoader classLoader = new WebApplicationClassLoader(new URL[]{url}, XmlUtils.class.getClassLoader());
+        File webXml = new File(appDir, "WEB-INF/web.xml");
+
+        InputStream resourceAsStream;
+        try {
+            resourceAsStream = new FileInputStream(webXml);
+        } catch (FileNotFoundException e) {
+            logger.warn("web.xml not found in {}/WEB-INF", appDir.getAbsolutePath());
+            return;
+        }
+
+        SAXReader saxReader = new SAXReader();
+        String appName = "/" + appDir.getName(); // lastname, 并以/开头
+        ApplicationContextManager.applyApplicationContext(appName);// apply servlet context
+        try {
+            Document document = saxReader.read(resourceAsStream);
+            loadFromWebXml(appName, document, classLoader);
+        } catch (DocumentException e) {
+            logger.error("read web.xml error");
+            e.printStackTrace();
+        }
+    }
+    private static void loadFromWebXml(String appName, Document document, ClassLoader classLoader) {
+        loadContextFromWebXml(appName, document);
+        loadServletFromWebXml(appName, document, classLoader);
+    }
+    private static void loadContextFromWebXml(String appName, Document document) {
+        /**
+         * <context-param>
+         *    <param-name>context-param1</param-name>
+         *    <param-value>100</param-value>
+         *  </context-param>
+         */
+        ServletContext applicationContext = ApplicationContextManager.getApplicationContext(appName);
+        Element rootElement = document.getRootElement();
+        List<Element> selectNodes = rootElement.elements("context-param");
+        for (Element element : selectNodes) {
+            String name = element.elementText("param-name");
+            String value = element.elementText("param-value");
+            applicationContext.setInitParameter(name, value);
+        }
+    }
+    private static void loadServletFromWebXml(String appName, Document document, ClassLoader classLoader) {
         try {
             // 类加载器，用于反射创建servlet对象
-            ApplicationContext applicationContext = ApplicationContextManager.getApplicationContext();
+            ApplicationContext applicationContext = ApplicationContextManager.getApplicationContext(appName);
 
             Element rootElement = document.getRootElement();
             List<Element> selectNodes = rootElement.elements("servlet");
@@ -84,7 +170,7 @@ public class XmlUtils {
                     /**
                      * 3. 注册对应的 url + servlet 到 context
                      */
-                    applicationContext.registerServlet(urlPrefix + urlPattern, httpServlet);
+                    applicationContext.registerServlet(appName + urlPattern, httpServlet);
                     /**
                      * 4. 绑定servlet和对应的config, 并初始化
                      */
