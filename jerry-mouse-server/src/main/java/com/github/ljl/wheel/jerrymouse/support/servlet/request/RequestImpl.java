@@ -9,6 +9,7 @@ import javax.servlet.*;
 import javax.servlet.http.*;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.security.Principal;
 import java.util.Collection;
@@ -41,7 +42,7 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public Cookie[] getCookies() {
-        return new Cookie[0];
+        return requestData.getCookies();
     }
 
     @Override
@@ -86,7 +87,7 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public String getContextPath() {
-        return null;
+        return servletContext.getContextPath();
     }
 
     @Override
@@ -131,22 +132,22 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public HttpSession getSession(boolean create) {
-        return null;
+        return requestData.getSession(create);
     }
 
     @Override
     public HttpSession getSession() {
-        return null;
+        return requestData.getSession();
     }
 
     @Override
     public String changeSessionId() {
-        return null;
+        return requestData.changeSessionId();
     }
 
     @Override
     public boolean isRequestedSessionIdValid() {
-        return false;
+        return requestData.isRequestedSessionIdValid();
     }
 
     @Override
@@ -230,8 +231,8 @@ public class RequestImpl implements HttpServletRequest {
     }
 
     @Override
-    public ServletInputStream getInputStream() throws IOException {
-        return null;
+    public ServletInputStream getInputStream() {
+        return requestData.getInputStream();
     }
 
     @Override
@@ -256,7 +257,7 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public String getProtocol() {
-        return null;
+        return requestData.getProtocol();
     }
 
     @Override
@@ -276,7 +277,7 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public BufferedReader getReader() throws IOException {
-        return null;
+        return new BufferedReader(new InputStreamReader(getInputStream()));
     }
 
     @Override

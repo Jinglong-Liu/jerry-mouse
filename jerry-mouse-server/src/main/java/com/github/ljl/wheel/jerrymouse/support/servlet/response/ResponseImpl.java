@@ -52,7 +52,7 @@ public class ResponseImpl implements HttpServletResponse {
 
     @Override
     public void addCookie(Cookie cookie) {
-
+        responseData.addCookie(cookie);
     }
 
     @Override

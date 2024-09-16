@@ -1,9 +1,9 @@
 package com.github.ljl.wheel.jerrymouse.support.servlet.request;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.github.ljl.wheel.jerrymouse.utils.StringUtils;
+
+import javax.servlet.http.Cookie;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -84,6 +84,35 @@ public class RequestParser {
         }
 
         return headers;
+    }
+
+    public static Cookie[] parseCookies(Map<String, String> headers) {
+
+        if (Objects.isNull(headers)) {
+            return new Cookie[0];
+        }
+
+        final String cookieKey = headers.keySet().stream()
+                .filter(key -> key.trim().equalsIgnoreCase("Cookie"))
+                .findFirst().orElse("Cookie");
+
+        String cookieLine = headers.get(cookieKey);
+        if (StringUtils.isEmpty(cookieLine)) {
+            return new Cookie[0];
+        }
+
+        String[] cookiePairs = cookieLine.split("; ");
+
+        List<Cookie> cookieList = new ArrayList<>();
+
+        Arrays.stream(cookiePairs).forEach(pair -> {
+            String[] keyValue = pair.split("=", 2);
+            if (keyValue.length == 2) {
+                cookieList.add(new Cookie(keyValue[0], keyValue[1]));
+            }
+        });
+
+        return cookieList.toArray(new Cookie[0]);
     }
 
     /**
