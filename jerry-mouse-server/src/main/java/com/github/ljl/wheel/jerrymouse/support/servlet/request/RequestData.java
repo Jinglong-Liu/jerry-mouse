@@ -1,19 +1,23 @@
 package com.github.ljl.wheel.jerrymouse.support.servlet.request;
 
 import com.github.ljl.wheel.jerrymouse.support.context.ApplicationContext;
+import com.github.ljl.wheel.jerrymouse.support.servlet.session.HttpSessionFactory;
+import com.github.ljl.wheel.jerrymouse.support.servlet.session.HttpSessionImpl;
 import com.github.ljl.wheel.jerrymouse.utils.HttpUtils;
+import com.github.ljl.wheel.jerrymouse.utils.SessionUtils;
 import lombok.Data;
 import lombok.Getter;
+import lombok.Setter;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletRequest;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @program: jerry-mouse
@@ -38,6 +42,8 @@ public class RequestData {
 
     private final Map<String, Object> attributes = new HashMap<>();
 
+    private final Cookie[] cookies;
+
     private String body;
 
     private String uri;
@@ -46,17 +52,26 @@ public class RequestData {
 
     private String requestURI;
 
-    private final ServletRequest request;
+    private final HttpServletRequest request;
+
+    @Getter
+    @Setter
+    private HttpSession session;
+
+    @Setter
+    @Getter
+    private String protocol;
 
     @Getter
     private ServletInputStream inputStream;
 
-    public RequestData(ServletRequest request, String requestMessage) {
+    public RequestData(HttpServletRequest request, String requestMessage) {
         this.request = request;
         this.headers = RequestParser.parseHeaders(requestMessage);
         this.parameters = RequestParser.parseQueryParams(requestMessage);
         this.body = RequestParser.parseRequestBody(requestMessage);
         this.inputStream = new ServletInputStreamWrapper(this.body);
+        this.cookies = RequestParser.parseCookies(this.headers);
         RequestParser.parseRequestLine(requestMessage, this);
     }
     public void setHeaders(Map<String, String> headers) {
@@ -167,6 +182,69 @@ public class RequestData {
         String contextType = HttpUtils.replaceCharacterEncoding(charSet, oldContentType);
         headers.put(CONTENT_TYPE_HEADER_NAME, contextType);
     }
+
+    public HttpSession getSession(boolean create) {
+        final ApplicationContext applicationContext = (ApplicationContext) request.getServletContext();
+        final String sessionIdFieldName = applicationContext.getSessionIdFieldName();
+        // 同一个request, 已经有了session
+        if (isRequestedSessionIdValid()) {
+            return session;
+        }
+        // sessionId
+        if (Objects.nonNull(cookies)) {
+            String sessionId = Arrays.stream(cookies)
+                    .filter(cookie -> cookie.getName().trim().equalsIgnoreCase(sessionIdFieldName))
+                    .map(Cookie::getValue)
+                    .findFirst().orElse(null);
+            if (Objects.nonNull(sessionId)) {
+                HttpSession httpSession = applicationContext.findSession(sessionId);
+                if (Objects.nonNull(httpSession)) {
+                    return httpSession;
+                }
+            }
+        }
+
+        if (create) {
+            session = HttpSessionFactory.createHttpSession(request);
+        } else {
+            session = null;
+        }
+        return session;
+    }
+    /**
+     * Returns the current session associated with this request,
+     * or if the request does not have a session, creates one.
+     * @return
+     */
+    public HttpSession getSession() {
+        if (!isRequestedSessionIdValid()) {
+            session = HttpSessionFactory.createHttpSession(this.request);
+        }
+        return session;
+    }
+
+    public String changeSessionId() {
+        String oldId = session.getId();
+        ((HttpSessionImpl)session).setId(SessionUtils.generateSessionId());
+        ApplicationContext applicationContext = (ApplicationContext) request.getServletContext();
+        applicationContext.changeSessionId(session, oldId);
+        return session.getId();
+    }
+
+    public boolean isRequestedSessionIdValid() {
+        if (Objects.isNull(session)) {
+            return false;
+        }
+        // 判断session是否合法
+        HttpSessionImpl httpSession = (HttpSessionImpl) session;
+        return httpSession.isValid();
+    }
+
+    public Cookie[] getCookies() {
+        return cookies;
+    }
+
+
 
     class ServletInputStreamWrapper extends ServletInputStream {
 

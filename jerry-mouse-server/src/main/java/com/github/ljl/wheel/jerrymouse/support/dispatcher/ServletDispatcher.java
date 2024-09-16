@@ -12,6 +12,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @program: jerry-mouse
@@ -32,12 +33,14 @@ public class ServletDispatcher implements IDispatcher {
         ApplicationContext applicationContext = (ApplicationContext) request.getServletContext();
         HttpServlet httpServlet = applicationContext.getServletByURI(request.getRequestURI());
         List<Filter> filterList = applicationContext.getMatchFilters(request.getRequestURI());
+        if (Objects.isNull(httpServlet)) {
+            logger.error("Servlet not found! uri = {}", request.getRequestURI());
+            response.getSockerWriter().write(HttpUtils.http404Resp());
+            return;
+        }
         try {
             // httpServlet.service(request, response);
             filter(httpServlet, request, response, filterList);
-        } catch (NullPointerException e) {
-            logger.error("Servlet not found!");
-            response.getSockerWriter().write(HttpUtils.http404Resp());
         } catch (ServletException | IOException e) {
             logger.error("Server meet error when do servlet Service");
             e.printStackTrace();

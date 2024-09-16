@@ -12,6 +12,13 @@
     <artifactId>jerry-mouse-server</artifactId>
 
     <dependencies>
+
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy</artifactId>
+            <version>${net.bytebuddy.byte-buddy.id}</version>
+        </dependency>
+
         <dependency>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>

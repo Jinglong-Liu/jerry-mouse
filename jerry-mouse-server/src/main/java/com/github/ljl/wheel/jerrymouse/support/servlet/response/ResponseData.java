@@ -3,6 +3,7 @@ package com.github.ljl.wheel.jerrymouse.support.servlet.response;
 import com.github.ljl.wheel.jerrymouse.utils.HttpUtils;
 import lombok.Data;
 
+import javax.servlet.http.Cookie;
 import java.util.*;
 
 /**
@@ -21,6 +22,7 @@ public class ResponseData {
 
     private static final String CONTENT_TYPE_HEADER_NAME = "Content-Type";
     private static final String CONTENT_LENGTH_HEADER_NAME = "Content-Length";
+    private static final String RESPONSE_COOKIE_HEADER_NAME = "Set-Cookie";
 
     public void setContentType(String type) {
 
@@ -105,5 +107,23 @@ public class ResponseData {
 
     public String getContentType() {
         return headers.get(CONTENT_TYPE_HEADER_NAME);
+    }
+
+    public void addCookie(Cookie cookie) {
+        String cookieLine = headers.get(RESPONSE_COOKIE_HEADER_NAME);
+        List<String> cookies = new ArrayList<>();
+        if (cookieLine != null && !cookieLine.isEmpty()) {
+            // 解析现有的cookieLine
+            String[] existingCookies = cookieLine.split("; ");
+            for (String existingCookie : existingCookies) {
+                if (!existingCookie.startsWith(cookie.getName() + "=")) {
+                    cookies.add(existingCookie);
+                }
+            }
+        }
+        // 添加新的cookie
+        cookies.add(cookie.getName() + "=" + cookie.getValue());
+        String newCookieLine = String.join("; ", cookies);
+        headers.put(RESPONSE_COOKIE_HEADER_NAME, newCookieLine);
     }
 }
