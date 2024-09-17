@@ -7,6 +7,7 @@ import com.github.ljl.wheel.jerrymouse.support.servlet.listener.ListenerManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.session.HttpSessionImpl;
 import com.github.ljl.wheel.jerrymouse.support.servlet.session.SessionManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.session.SessionTaskManager;
+import com.github.ljl.wheel.jerrymouse.utils.StringUtils;
 import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
@@ -77,7 +78,7 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public String getContextPath() {
-        return null;
+        return StringUtils.isEmpty(appName) ? null: appName;
     }
 
     @Override
@@ -117,12 +118,12 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public URL getResource(String path) throws MalformedURLException {
-        return null;
+        return classLoader.getResource(path);
     }
 
     @Override
     public InputStream getResourceAsStream(String path) {
-        return null;
+        return classLoader.getResourceAsStream(path);
     }
 
     @Override
@@ -138,6 +139,11 @@ public class ApplicationContext implements ServletContext {
     @Override
     public Servlet getServlet(String name) throws ServletException {
         return servletManager.getServlet(name);
+    }
+
+    public String getServletPath(String uri) {
+        Object[] pair = servletManager.getServletAndPath(uri);
+        return (String) pair[1];
     }
 
     @Deprecated
@@ -171,7 +177,7 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public String getRealPath(String path) {
-        return null;
+        throw new MethodNotSupportException("getRealPath not support in servletContext");
     }
 
     @Override

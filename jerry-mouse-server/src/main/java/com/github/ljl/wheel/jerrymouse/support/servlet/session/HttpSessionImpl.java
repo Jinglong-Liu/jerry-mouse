@@ -32,6 +32,8 @@ public class HttpSessionImpl implements HttpSession {
 
     private volatile boolean isValid = true;
 
+    private boolean isNew;
+
     private HttpServletRequest request;
 
     private String sessionId;
@@ -46,6 +48,7 @@ public class HttpSessionImpl implements HttpSession {
     }
 
     public void init(HttpServletRequest request) {
+        this.isNew = true;
         this.request = request;
         this.createTimeMillis = System.currentTimeMillis();
         this.lastAccessedTime = System.currentTimeMillis();
@@ -180,13 +183,15 @@ public class HttpSessionImpl implements HttpSession {
         }
     }
 
+    @SessionValidCheck
     @Override
     public boolean isNew() {
-        return false;
+        return isNew;
     }
 
     public void updateLastAccessedTime() {
         this.lastAccessedTime = System.currentTimeMillis();
+        this.isNew = false;
         logger.info("session {} update last accessed time", getId());
         logger.info("currentTime = {}, expireTime = {}", TimeUtils.format(this.lastAccessedTime), this.expireTime > 0 ? TimeUtils.format(this.expireTime) : -1);
     }

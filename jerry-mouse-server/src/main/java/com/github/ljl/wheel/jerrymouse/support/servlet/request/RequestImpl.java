@@ -12,10 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.security.Principal;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @program: jerry-mouse
@@ -127,7 +124,17 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public String getServletPath() {
-        return null;
+        /**
+         * This method will return an empty string ("")
+         * if the servlet used to process this request was matched using the "/*" pattern.
+         */
+        String uri = getRequestURI();
+        if (Objects.isNull(uri) || uri.endsWith("/*")) {
+            return "";
+        }
+        // match
+        ApplicationContext applicationContext = (ApplicationContext) this.servletContext;
+        return applicationContext.getServletPath(uri);
     }
 
     @Override
@@ -377,7 +384,7 @@ public class RequestImpl implements HttpServletRequest {
 
     @Override
     public DispatcherType getDispatcherType() {
-        return null;
+        return DispatcherType.REQUEST;
     }
 
     public void setServletContext(ServletContext servletContext) {
