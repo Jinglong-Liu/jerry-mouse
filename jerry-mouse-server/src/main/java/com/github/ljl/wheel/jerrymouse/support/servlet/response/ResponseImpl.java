@@ -46,7 +46,6 @@ public class ResponseImpl implements HttpServletResponse {
         this.responseData = new ResponseData();
         this.printWriter = new HttpPrintWriter(new StringWriter());
         this.outputStream = new ByteArrayServletOutputStream();
-        this.setContentType(CONTENT_TYPE_TEXT_HTML);
         this.setStatus(200);
     }
 
