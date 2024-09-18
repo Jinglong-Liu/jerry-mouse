@@ -12,7 +12,6 @@
     <artifactId>jerry-mouse-server</artifactId>
 
     <dependencies>
-
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>

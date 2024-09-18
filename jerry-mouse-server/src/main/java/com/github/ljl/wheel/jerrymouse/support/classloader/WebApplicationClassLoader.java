@@ -63,7 +63,6 @@ public class WebApplicationClassLoader extends URLClassLoader {
         } else {
             jarPaths = Collections.emptyList();
         }
-
     }
 
     @Override
