@@ -8,5 +8,5 @@ package com.github.ljl.wheel.jerrymouse.bootstrap;
  **/
 
 public interface WebServerBootstrap {
-    void start();
+    void start(Integer port);
 }

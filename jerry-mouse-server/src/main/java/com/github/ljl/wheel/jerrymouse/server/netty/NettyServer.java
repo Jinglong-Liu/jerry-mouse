@@ -21,12 +21,12 @@ import org.slf4j.LoggerFactory;
 
 public class NettyServer implements WebServerBootstrap {
     public static final String HOST = "127.0.0.1";
-    public static final int PORT = 8888;
+
     private Logger logger = LoggerFactory.getLogger(getClass());
 
-    public void start() {
-        logger.info("start listen on port {}", PORT);
-        logger.info("visit url http://{}:{}", HOST, PORT);
+    public void start(Integer port) {
+        logger.info("start listen on port {}", port);
+        logger.info("visit url http://{}:{}", HOST, port);
 
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         //worker 线程池的数量默认为 CPU 核心数的两倍
@@ -46,7 +46,7 @@ public class NettyServer implements WebServerBootstrap {
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
 
             // Bind and start to accept incoming connections.
-            ChannelFuture future = serverBootstrap.bind(PORT).sync();
+            ChannelFuture future = serverBootstrap.bind(port).sync();
 
             // Wait until the server socket is closed.
             future.channel().closeFuture().sync();

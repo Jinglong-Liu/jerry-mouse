@@ -52,7 +52,15 @@ public class FilterConfigImpl implements FilterConfig {
         return Collections.enumeration(initParameterMap.keySet());
     }
 
-    public void setInitParameter(String name, String value) {
+    public boolean setInitParameter(String name, String value) {
+        if (initParameterMap.containsKey(name)) {
+            return false;
+        }
         initParameterMap.put(name, value);
+        return true;
+    }
+
+    public Map<String, String> getInitParameters() {
+        return initParameterMap;
     }
 }

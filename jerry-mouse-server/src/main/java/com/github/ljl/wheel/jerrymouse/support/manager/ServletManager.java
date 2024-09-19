@@ -1,7 +1,9 @@
 package com.github.ljl.wheel.jerrymouse.support.manager;
 
+import javax.servlet.Servlet;
 import javax.servlet.http.HttpServlet;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @program: jerry-mouse
@@ -19,7 +21,7 @@ public class ServletManager {
             String[] pair = pairs.get(0);
             return servletMap.get(pair[0]);
         } else {
-            return null;
+            return servletMap.get("/");
         }
     }
     public Object[] getServletAndPath(String url) {
@@ -74,5 +76,24 @@ public class ServletManager {
             return "";
         }
         return null;
+    }
+
+    /**
+     * 可能多个pattern对应一个servlet
+     * @param servlet
+     * @return
+     */
+    public Enumeration<String> getServletPatterns(Servlet servlet) {
+        if (Objects.isNull(servlet)) {
+            return Collections.emptyEnumeration();
+        }
+        Set<String> set = servletMap.entrySet()
+                .stream()
+                .filter(entry -> entry.getValue().getClass().getName().equals(servlet.getClass().getName()))
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
+        return Collections.enumeration(set);
+    }
+    public Enumeration<String> getServletPatterns() {
+        return Collections.enumeration(servletMap.keySet());
     }
 }

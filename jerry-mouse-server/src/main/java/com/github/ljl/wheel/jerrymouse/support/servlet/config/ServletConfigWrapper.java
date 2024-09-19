@@ -2,10 +2,7 @@ package com.github.ljl.wheel.jerrymouse.support.servlet.config;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @program: jerry-mouse
@@ -48,8 +45,17 @@ public class ServletConfigWrapper implements ServletConfig {
         return Collections.enumeration(initParams.keySet());
     }
 
-    public void setInitParameter(String paramName, String paramValue) {
+    public boolean setInitParameter(String paramName, String paramValue) {
+        if (initParams.containsKey(paramName)) {
+            return false;
+        }
+
         initParams.put(paramName, paramValue);
+        return true;
+    }
+
+    public Map<String, String> getInitParameters() {
+        return Objects.nonNull(initParams) ? initParams: Collections.emptyMap();
     }
 
     public String getClazzName() {

@@ -4,6 +4,8 @@ import com.github.ljl.wheel.jerrymouse.exception.MethodNotSupportException;
 import com.github.ljl.wheel.jerrymouse.support.manager.ServletManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.filter.FilterManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.listener.ListenerManager;
+import com.github.ljl.wheel.jerrymouse.support.servlet.registration.ApplicationFilterRegistration;
+import com.github.ljl.wheel.jerrymouse.support.servlet.registration.ApplicationServletRegistration;
 import com.github.ljl.wheel.jerrymouse.support.servlet.session.HttpSessionImpl;
 import com.github.ljl.wheel.jerrymouse.support.servlet.session.SessionManager;
 import com.github.ljl.wheel.jerrymouse.support.servlet.session.SessionTaskManager;
@@ -160,19 +162,25 @@ public class ApplicationContext implements ServletContext {
         return Collections.emptyEnumeration();
     }
 
+    public Collection<String> getServletPatterns(Servlet servlet) {
+        return Collections.list(servletManager.getServletPatterns(servlet));
+    }
+    public Collection<String> getServletPatterns() {
+        return Collections.list(servletManager.getServletPatterns());
+    }
     @Override
     public void log(String msg) {
-
+        logger.info(msg);
     }
 
     @Override
     public void log(Exception exception, String msg) {
-
+        logger.error(msg, exception);
     }
 
     @Override
     public void log(String message, Throwable throwable) {
-
+        logger.error(message, throwable);
     }
 
     @Override
@@ -259,17 +267,21 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName, String className) {
-        return null;
+        throw new MethodNotSupportException("addServlet(servletName, className) Method Not Support");
     }
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName, Servlet servlet) {
-        return null;
+        // servletName = "dispatchServlet"
+        // servlet = "DispatchServlet"
+        servletManager.register(servletName, (HttpServlet) servlet);
+        ApplicationServletRegistration registration = new ApplicationServletRegistration(this, servletName, servlet);
+        return registration;
     }
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName, Class<? extends Servlet> servletClass) {
-        return null;
+        throw new MethodNotSupportException("addServlet(servletName, className) Method Not Support");
     }
 
     @Override
@@ -294,17 +306,18 @@ public class ApplicationContext implements ServletContext {
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, String className) {
-        return null;
+        throw new MethodNotSupportException("addFilter(filterName, className) Method Not Support");
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, Filter filter) {
-        return null;
+        filterManager.register(filterName, filter);
+        return new ApplicationFilterRegistration(this, filterName, filter);
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, Class<? extends Filter> filterClass) {
-        return null;
+        throw new MethodNotSupportException("addFilter(filterName, filterClass) Method Not Support");
     }
 
     @Override

@@ -14,11 +14,10 @@ import java.net.InetSocketAddress;
 
 public class ReactorServer implements WebServerBootstrap {
     public static final String HOST = "127.0.0.1";
-    public static final Integer PORT = 8888;
 
     @Override
-    public void start() {
+    public void start(Integer port) {
         ReactorBootstrap reactorBootStrap = ReactorBootstrap.build();
-        reactorBootStrap.bind(new InetSocketAddress(HOST, PORT));
+        reactorBootStrap.bind(new InetSocketAddress(HOST, port));
     }
 }

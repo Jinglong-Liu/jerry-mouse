@@ -11,6 +11,6 @@ import com.github.ljl.wheel.jerrymouse.bootstrap.JerryMouseBootstrap;
 
 public class Main {
     public static void main(String[] args) {
-        (new JerryMouseBootstrap()).start();
+        (new JerryMouseBootstrap()).start(8888);
     }
 }

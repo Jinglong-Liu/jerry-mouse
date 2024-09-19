@@ -28,6 +28,15 @@ public class ApplicationContextManager {
         return applicationContextMap.get(appName);
     }
 
+    public static ApplicationContext getOrCreateApplication(String appName) {
+        if (applicationContextMap.containsKey(appName)) {
+            return applicationContextMap.get(appName);
+        }
+        ApplicationContext context = new ApplicationContext(appName, Thread.currentThread().getContextClassLoader());
+        applicationContextMap.put(appName, context);
+        return context;
+    }
+
     public static ApplicationContext getApplicationContext(HttpServletRequest request) {
         // 根据request，解析出appName
         String appName = request.getRequestURI();

@@ -10,6 +10,8 @@
     <version>1.0-SNAPSHOT</version>
     <modules>
         <module>jerry-mouse-server</module>
+        <module>spring-boot-web-demo1</module>
+        <module>spring-boot-starter-jerry-mouse</module>
     </modules>
 
     <properties>
